@@ -1,0 +1,13 @@
+# Core engine + training deps.
+# torch is pinned to the CPU build for now; when the RTX 5070 arrives, reinstall with:
+#   pip uninstall torch
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+# (no code change needed — the trainers pick the device via torch.cuda.is_available())
+python-chess>=1.11
+torch>=2.9
+numpy>=2.0
+pygame>=2.6
+# numba JITs the NNUE eval hot path (engine/nnue/fast_infer.py + kernels.py),
+# making NNUE search ~8x faster on CPU. >=0.62 is required for NumPy 2.3.
+# The engine falls back to the pure-NumPy NNUE path if numba is missing.
+numba>=0.62

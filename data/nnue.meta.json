@@ -1,0 +1,7 @@
+{
+  "epochs": 60,
+  "label_depth": 9,
+  "lambda": 0.8,
+  "note": "backfilled from PROGRESS.md",
+  "positions": 257000
+}

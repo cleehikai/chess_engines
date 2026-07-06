@@ -1,0 +1,53 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.eggs/
+.venv/
+venv/
+env/
+.env
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- Stockfish engine (bundled binary + source, not our code) ----
+tools/stockfish.exe
+tools/stockfish/
+*.exe
+
+# ---- Trained models / weights (large binaries) ----
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.nnue
+
+# ---- Generated training data ----
+data/*.tsv
+data/*.pgn
+
+# ---- Generated / run artifacts ----
+data/last_game.pgn
+data/ratings.csv
+
+# (data/nnue.meta.json is intentionally tracked — tiny net-version metadata)
+
+# ---- graphify generated output ----
+graphify-out/
+
+# ---- Claude Code local session/harness state ----
+.claude/
+
+# ---- Editor / OS ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
