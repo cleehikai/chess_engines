@@ -151,6 +151,42 @@ def rate(opponents: Sequence[Opponent]) -> Rating:
     return Rating(best, low, high, total_games, total_score)
 
 
+RATINGS_FILE = config.RESULTS / "ratings.jsonl"
+
+
+def load_ratings() -> list[dict]:
+    """Every rating measured so far, newest last.
+
+    `results/ratings.jsonl` is append-only: a rating is a record of an
+    experiment that was actually run, so re-rating a method adds a row rather
+    than overwriting one. Callers that want "the current rating" should take
+    the last row for a (method, budget) pair.
+    """
+    if not RATINGS_FILE.exists():
+        return []
+    rows = []
+    for line in RATINGS_FILE.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line:
+            rows.append(json.loads(line))
+    return rows
+
+
+def latest_ratings() -> dict[tuple[str, str], dict]:
+    """The most recent rating for each (method, budget), keyed by that pair."""
+    return {(row["method"], row["budget"]): row for row in load_ratings()}
+
+
+def describe(row: dict) -> str:
+    """Render one rating row the way `Rating.__str__` would."""
+    if row.get("bounded") == "above":
+        return f"> {row['low']:.0f} Elo"
+    if row.get("bounded") == "below":
+        return f"< {row['high']:.0f} Elo"
+    span = (row["high"] - row["low"]) / 2
+    return f"{row['elo']:.0f} +/- {span:.0f} Elo"
+
+
 # --------------------------------------------------------------------------
 # The ladder
 # --------------------------------------------------------------------------

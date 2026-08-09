@@ -5,6 +5,8 @@
     python -m lab.cli rate M0-greedy --games 20   # score a method on the ladder
     python -m lab.cli match M0-greedy M0-random   # head-to-head between methods
     python -m lab.cli ablate --games 40           # what each eval term is worth
+    python -m lab.cli ratings                     # every Elo measured so far
+    python -m lab.cli play                        # play the engine in a browser
     python -m lab.cli bench                       # FSF throughput on this box
 """
 
@@ -135,13 +137,55 @@ def cmd_rate(args: argparse.Namespace) -> int:
 
 
 def cmd_match(args: argparse.Namespace) -> int:
-    budget = _budget_from(args)
-    a = arena.MethodPlayer(methods.build(args.method_a), budget)
-    b = arena.MethodPlayer(methods.build(args.method_b), budget)
+    budget_a = _budget_from(args)
+    # `--nodes-b` gives the second player a different budget. That is normally
+    # unfair by design and so is opt-in, but it is the only way to ask how well
+    # a method converts extra compute into strength — a question the ladder
+    # cannot answer for a method far weaker than every rung on it.
+    budget_b = methods.Budget(nodes=args.nodes_b) if args.nodes_b else budget_a
+    a = arena.MethodPlayer(methods.build(args.method_a), budget_a)
+    b = arena.MethodPlayer(methods.build(args.method_b), budget_b)
     match = arena.play_match(a, b, args.games, seed=args.seed, progress=not args.quiet)
     print(f"\n{match}")
+    result = rating.rate([rating.Opponent(b.name, 0.0, match.score_a, len(match.games))])
+    print(f"  {a.name} is {result} relative to {b.name}")
     match.to_jsonl(config.RESULTS / "matches.jsonl")
     return 0
+
+
+def cmd_ratings(args: argparse.Namespace) -> int:
+    """Everything measured so far, on one scale."""
+    ladder = rating.load_ladder()
+    print(f"=== Fairy-Stockfish ladder ({'measured' if rating.is_calibrated() else 'PRIOR'}) ===")
+    for rung, elo in sorted(ladder.items()):
+        anchor = "  <- anchor" if rung == rating.REFERENCE_RUNG else ""
+        print(f"  {f'fsf-nnue-{rung // 1000}kn':<20} {elo:8.0f} Elo{anchor}")
+
+    rows = rating.latest_ratings()
+    if not rows:
+        print("\nno methods rated yet; run `lab.cli rate <method> --nodes N`")
+        return 0
+    print("\n=== methods ===")
+    for (method, budget), row in sorted(rows.items(), key=lambda kv: -kv[1]["elo"]):
+        note = "" if row.get("calibrated", True) else "   (uncalibrated ladder)"
+        print(
+            f"  {method:<20} @{budget:<10} {rating.describe(row):<20}"
+            f" {row['score']:>5}/{row['games']:<4}{note}"
+        )
+    if not args.quiet:
+        print(
+            "\nThis scale is internal: the 64k-node rung is pinned at 2000 by"
+            "\ndefinition. Only differences mean anything - do not compare these"
+            "\nnumbers to Lichess or CCRL ratings."
+        )
+    return 0
+
+
+def cmd_play(args: argparse.Namespace) -> int:
+    """Serve the browser UI for playing against the engine."""
+    from . import server
+
+    return server.serve(host=args.host, port=args.port, open_browser=not args.no_browser)
 
 
 def cmd_ablate(args: argparse.Namespace) -> int:
@@ -221,6 +265,16 @@ def main(argv: list[str] | None = None) -> int:
     p_match.add_argument("method_b", choices=sorted(methods.REGISTRY))
     p_match.add_argument("--games", type=int, default=20)
     add_budget(p_match)
+    p_match.add_argument(
+        "--nodes-b", type=int, help="give method_b a different node budget"
+    )
+
+    sub.add_parser("ratings", help="show every rating measured so far")
+
+    p_play = sub.add_parser("play", help="play the engine in a browser")
+    p_play.add_argument("--host", default="127.0.0.1")
+    p_play.add_argument("--port", type=int, default=8770)
+    p_play.add_argument("--no-browser", action="store_true")
 
     p_abl = sub.add_parser("ablate", help="what is each eval term worth, in Elo")
     p_abl.add_argument("--reference", default="M1-alphabeta", choices=sorted(methods.REGISTRY))
@@ -236,6 +290,8 @@ def main(argv: list[str] | None = None) -> int:
         "rate": cmd_rate,
         "match": cmd_match,
         "ablate": cmd_ablate,
+        "ratings": cmd_ratings,
+        "play": cmd_play,
     }
     return handlers[args.command](args)
 

@@ -45,31 +45,39 @@ its central claim. Removing **material** costs 269 Elo; removing **blast-radius
 king safety** costs 17 ± 109 — indistinguishable from nothing. The ranking is
 exactly backwards from the hypothesis.
 
-The follow-up experiment is what makes this useful rather than merely negative.
-The obvious escape hatch — "the search is deep enough to see the blast, so the
-static term is redundant" — predicts that the term pays at shallow depth and
-decays as nodes rise. It does not: measured at 2k, 8k, 32k and 128k nodes, the
-term is worth +6, +23, +17 and +0 Elo, flat across a 64× range.
+The follow-up experiments are what make this useful rather than merely
+negative. The obvious escape hatch — "the search is deep enough to see the
+blast, so the static term is redundant" — predicts that the term pays at
+shallow depth and decays as nodes rise. It does not: measured at 2k, 8k, 32k
+and 128k nodes, the term is worth +6, +23, +17 and +0 Elo, flat across a 64×
+range.
 
 What does explain it is *which part of the search* covers the term. A fuse is
 lit by a capture, and quiescence searches every capture, so a capture-only
 quiescence already spans the whole threat space the term describes — at every
-depth, which is why the depth sweep is flat. Turning quiescence off and
-re-running the same ablation moves king safety from +17 ± 109 to +83 ± 91 Elo.
-That is the predicted direction and roughly a 5× increase, though with a
-confidence interval that still touches zero it is support, not proof.
+depth, which is why the depth sweep is flat. Running the ablation with and
+without quiescence, 400 games per arm:
 
-Meanwhile quiescence itself is worth **+203 ± 128 Elo** — more than every
-atomic-specific evaluation term put together.
+| Blast-radius king safety is worth | Elo | 95% interval |
+|---|---|---|
+| with quiescence | **-24 ± 34** | [-58, +10] |
+| without quiescence | **+55 ± 35** | [+20, +90] |
 
-*Revised claim, to be tested by M2–M4:* in atomic, king safety is a **tactical**
-property rather than a positional one, and therefore belongs in the search, not
-the evaluation. This is a real difference from standard chess, where king safety
-must be static because attacks assemble over more plies than any search can
-reach. If it holds, it predicts something specific and awkward for M2: an NNUE
-distilled from FSF will spend a large fraction of its capacity re-encoding
-tactics that a cheap quiescence search already gets for free, and should
-therefore underperform its standard-chess strength-per-parameter.
+The intervals do not overlap. The term is real knowledge — worth +55 Elo when
+nothing else supplies it — and is then made wholly redundant by quiescence, to
+the point of being mildly counterproductive alongside it. Quiescence itself is
+worth **+203 ± 128 Elo**, more than every atomic-specific evaluation term
+combined.
+
+*Revised claim, to be tested by M2–M4:* the hypothesis was right about **what**
+matters and wrong about **where to put it**. In atomic, king safety is a
+*tactical* property rather than a positional one, and therefore belongs in the
+search, not the evaluation. This is a real difference from standard chess, where
+king safety must be static because attacks assemble over more plies than any
+search can reach. If it holds, it predicts something specific and awkward for
+M2: an NNUE distilled from FSF will spend a large fraction of its capacity
+re-encoding tactics that a cheap quiescence search already gets for free, and
+should therefore underperform its standard-chess strength-per-parameter.
 
 ## M2 — NNUE distilled from Fairy-Stockfish
 

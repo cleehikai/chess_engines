@@ -121,40 +121,92 @@ constrains almost nothing.
 | pawn shield | +0 ± 109 |
 
 **The project's headline hypothesis — that atomic strength lives in
-blast-radius king safety — does not survive its first test.** The term is
-worth nothing measurable, and material, the thing atomic theory says is a weak
-signal, dominates.
+blast-radius king safety — does not survive contact with measurement in the
+form it was posed.** The term is worth nothing, and material, the thing atomic
+theory calls a weak signal, dominates.
 
-The obvious rescue is "the search already sees the blast, so the static term is
-redundant", which predicts the term pays at shallow depth and decays as nodes
-rise. **It does not.** Measured at 2k / 8k / 32k / 128k nodes, the term is worth
-+6 / +23 / +17 / +0 Elo — flat across a 64× range, all within ±90.
+The obvious rescue is "the search is deep enough to see the blast, so the
+static term is redundant", which predicts the term pays at shallow depth and
+decays as nodes rise. **It does not.** Measured at 2k / 8k / 32k / 128k nodes,
+the term is worth +6 / +23 / +17 / +0 Elo — flat across a 64× range.
 
-What does fit is *which part* of the search covers it. A fuse is lit by a
-capture, and quiescence searches every capture, so a capture-only quiescence
-spans the term's entire threat space at every depth — which is exactly why the
-depth sweep is flat. Re-running the same ablation with quiescence disabled
-moves king safety from +17 ± 109 to **+83 ± 91** Elo: the predicted direction
-and about a 5× increase, but with an interval that still touches zero, so this
-is support rather than proof.
+### Where the knowledge actually lives: a 2x2, at 400 games per arm
 
-**Working conclusion:** in atomic, king safety is a *tactical* property, not a
-positional one, and belongs in the search rather than the evaluation. That is a
-genuine departure from standard chess, where king safety has to be static
-because attacks assemble over more plies than any search reaches.
+What does explain the flat sweep is *which part* of the search already covers
+the term. A fuse is lit by a capture, and quiescence searches every capture, so
+a capture-only quiescence spans the term's entire threat space at every depth.
+Running the same ablation with and without quiescence, 400 games each:
+
+| Blast-radius king safety is worth | Elo | 95% interval |
+|---|---|---|
+| with quiescence | **-24 ± 34** | [-58, +10] |
+| without quiescence | **+55 ± 35** | [+20, +90] |
+
+**The intervals do not overlap.** The term is genuinely valuable knowledge —
+worth a solid +55 Elo when nothing else supplies it — and is then made entirely
+redundant by a capture-only quiescence search, to the point of being mildly
+counterproductive once quiescence is present.
+
+So the hypothesis was right about *what* matters and wrong about *where to put
+it*. In atomic, king safety is a **tactical** property, not a positional one,
+and belongs in the search rather than the evaluation. That is a real departure
+from standard chess, where king safety must be static because attacks assemble
+over more plies than any search can reach — and it is the first finding here
+that would change how someone builds an atomic engine.
+
+For scale, quiescence itself is worth **+203 ± 128 Elo**, more than every
+atomic-specific evaluation term put together.
+
+### M1 converts compute into strength; the ladder just cannot see it
+
+The ladder ratings for M1 at 4k / 16k / 64k nodes come out flat (1254 / 1296 /
+1254) with ±170 intervals — but that is a limitation of rating a method against
+opposition that beats it 90% of the time, not a property of M1. Measured
+directly, against itself at 1k nodes, 60 games per point:
+
+| M1 at | Elo above M1 @ 1k nodes |
+|---|---|
+| 4,000 | +260 ± 115 |
+| 16,000 | +417 ± 162 |
+| 256,000 | +483 ± 193 |
+| 1,024,000 | +585 ± 258 |
+
+M1 spans roughly 585 Elo from its weakest to its strongest setting, so the UI's
+difficulty levels are real. The lesson for the harness is that **a gauntlet
+against a much stronger ladder is the wrong instrument for questions about a
+weak method** — `match --nodes-b` and `ablate` are the right ones, and both
+exist now.
+
+## Playing the engine
+
+```powershell
+py -3.13 -m lab.cli ratings   # every Elo measured so far, on one scale
+py -3.13 -m lab.cli play      # browser UI, http://127.0.0.1:8770
+```
+
+The UI is served by `lab/server.py` (stdlib `http.server`, no new dependencies)
+with `ui/index.html` as its only page. The server is the referee: it owns the
+board, validates every move against the perft-checked
+`chess.variant.AtomicBoard`, and computes explosion squares, so the page never
+decides what is legal. Difficulty levels are node budgets, each labelled with
+its *measured* rating — a level that has not been rated says so rather than
+showing a guessed number.
 
 ## Next
 
-1. **Settle the king-safety question** at the sample size it deserves. The
-   no-quiescence arm is the one measurement that would turn a suggestive result
-   into a finding; 60 games leaves it touching zero, ~400 would not.
-2. **M2 — NNUE distilled from FSF.** The working conclusion above makes a
-   falsifiable prediction about it: a net that must re-encode tactics a cheap
-   quiescence already provides should show worse strength-per-parameter than
-   its standard-chess equivalent.
-3. Tune M1's weights before using it as a baseline for M3/M4. They are round
-   numbers chosen as hypotheses, never fitted, and `pawn_shield` measuring
-   exactly zero suggests at least one term is mis-weighted rather than useless.
+1. **M2 — NNUE distilled from FSF.** The 2x2 above makes a falsifiable
+   prediction about it: a net that has to re-encode tactics a cheap quiescence
+   already provides should show worse strength-per-parameter than its
+   standard-chess equivalent.
+2. **Tune M1's weights** before using it as a baseline for M3/M4. They are
+   round numbers chosen as hypotheses and never fitted. Now that
+   `king_blast` is known to be redundant with quiescence, the interesting
+   question is whether *any* static term survives contact with the search, or
+   whether atomic evaluation should be material plus mobility and nothing else.
+3. **Ablate the search, not just the eval.** Quiescence is worth more than
+   every evaluation term combined, which suggests the remaining strength is in
+   search structure. Null-move pruning was left out of M1 on the argument that
+   its central assumption is weak in atomic; that argument is now testable.
 
 ## Open questions worth an experiment
 

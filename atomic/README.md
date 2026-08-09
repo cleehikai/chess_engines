@@ -36,6 +36,8 @@ py -3.13 -m lab.cli calibrate --games 40      # measure the FSF Elo ladder
 py -3.13 -m lab.cli rate M0-greedy --games 20 # place a method on it
 py -3.13 -m lab.cli match M0-greedy M0-random # head-to-head
 py -3.13 -m lab.cli ablate --games 40         # what each eval term is worth
+py -3.13 -m lab.cli ratings                   # every Elo measured so far
+py -3.13 -m lab.cli play                      # play the engine in a browser
 ```
 
 `ablate` is the command that answers the project's actual question. It plays
@@ -59,7 +61,9 @@ atomic/
     rules.py              atomic-specific board helpers
     perft.py              movegen correctness gate (reference from FSF)
     tablebase.py          Lichess atomic tablebase client (cached)
+    server.py             the play-against-it UI, stdlib http.server
     cli.py                the command line
+  ui/index.html           the board page (no framework, no CDN)
   core/                   Rust: the hot loop (shakmaty + PyO3)
     src/eval.rs           atomic-native evaluation, one flag per term
     src/search.rs         alpha-beta, blast-aware ordering, atomic quiescence
@@ -115,6 +119,18 @@ reference counts match Fairy-Stockfish exactly, including the adversarial cases
 `lab.build_core` uses `maturin develop` inside a virtualenv and falls back to
 `maturin build` + `pip install` on a global Python, where `develop` refuses to
 run.
+
+## Playing it
+
+`lab.cli play` serves a board at `http://127.0.0.1:8770`. The server is the
+referee — it owns the position, validates every move against the perft-checked
+`AtomicBoard`, and computes explosion squares — so the page never decides what
+is legal. That keeps the genuinely hard part of atomic in the implementation
+that has been checked against Fairy-Stockfish rather than reimplemented in
+JavaScript, where it would drift.
+
+Difficulty levels are node budgets, each shown with its **measured** rating. A
+level that has not been rated yet says so instead of displaying a guess.
 
 ## Reading order
 

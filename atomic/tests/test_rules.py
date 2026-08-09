@@ -237,3 +237,49 @@ class TestM1Search:
 
         assert tuple(atomic_core.EVAL_TERMS) == EVAL_TERMS
         assert tuple(atomic_core.Engine().terms) == EVAL_TERMS
+
+
+class TestUiServer:
+    """The play-UI's state payload.
+
+    The page trusts the server for legality and for what exploded, so these
+    are the two things worth pinning down.
+    """
+
+    def test_state_lists_legal_moves_by_origin_square(self):
+        from lab import server
+
+        state = server._state(chess.variant.AtomicBoard())
+        assert state["turn"] == "white"
+        assert not state["over"]
+        assert sorted(state["legal"]["e2"]) == ["e2e3", "e2e4"]
+        # 8 pawns + 2 knights can move from the starting position.
+        assert len(state["legal"]) == 10
+
+    def test_state_reports_the_explosion(self):
+        """exd5 destroys both pawns; nothing else is adjacent and non-pawn."""
+        from lab import server
+
+        board = chess.variant.AtomicBoard()
+        for uci in ("e2e4", "d7d5"):
+            board.push(chess.Move.from_uci(uci))
+        board, move = server._board_from(board.fen(), "e4d5")
+        state = server._state(board, move)
+        assert state["blast"] == ["d5"]
+        assert state["last"] == "e4d5"
+        assert "d5" not in server._state(board)["blast"], "blast is per-move, not sticky"
+
+    def test_illegal_moves_are_refused(self):
+        from lab import server
+
+        with pytest.raises(ValueError):
+            server._board_from(chess.variant.AtomicBoard().fen(), "a1a8")
+
+    def test_levels_never_invent_a_rating(self):
+        """A difficulty level with no measurement must say so, not guess."""
+        from lab import server
+
+        server._levels.cache_clear()
+        for level in server._levels():
+            assert level["measured"] == (level["elo"] != "not yet measured")
+        server._levels.cache_clear()
