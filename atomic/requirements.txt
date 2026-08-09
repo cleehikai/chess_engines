@@ -1,0 +1,13 @@
+# Atomic lab — Python side.
+# The Rust core is built separately: `python -m lab.build_core`.
+
+chess>=1.11          # atomic rules + UCI engine protocol
+pytest>=8.0
+
+# Training track (M2/M3). Torch is already present in this environment with
+# CUDA 12.8 for the RTX 5070; pinning it here would fight that install.
+# torch>=2.5
+numpy>=1.26
+
+# Building the Rust core.
+maturin>=1.7

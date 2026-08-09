@@ -1,0 +1,13 @@
+# Binaries and nets are fetched by `python -m lab.cli setup`.
+bin/*.exe
+data/*.nnue
+data/*.pt
+data/*.sqlite
+
+# Measured output — regenerate rather than commit.
+results/
+
+# Rust build artefacts.
+core/target/
+*.pyd
+*.so

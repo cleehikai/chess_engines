@@ -1,0 +1,24 @@
+[package]
+name = "atomic-core"
+version = "0.1.0"
+edition = "2021"
+description = "Fast atomic chess board, movegen and search core for the atomic lab"
+license = "GPL-3.0-or-later"  # shakmaty is GPL-3.0-or-later
+
+[lib]
+name = "atomic_core"
+# cdylib for the Python extension module, rlib so Rust benches/tests can link it.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# The same Atomic implementation Lichess itself runs. Using it rather than
+# hand-rolling magic bitboards means the variant rules are correct by
+# construction, which is the part that is easy to get subtly wrong.
+# `variant` is off by default and is what gates `shakmaty::variant::Atomic`.
+shakmaty = { version = "0.30", features = ["variant"] }
+pyo3 = { version = "0.22", features = ["extension-module"] }
+
+[profile.release]
+lto = true
+codegen-units = 1
+panic = "abort"

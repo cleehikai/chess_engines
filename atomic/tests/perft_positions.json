@@ -1,0 +1,83 @@
+{
+  "source": "Fairy-Stockfish 14, UCI_Variant=atomic",
+  "positions": {
+    "startpos": {
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "perft": {
+        "1": 20,
+        "2": 400,
+        "3": 8902,
+        "4": 197326,
+        "5": 4864979
+      }
+    },
+    "kiwipete-ish": {
+      "fen": "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+      "perft": {
+        "1": 48,
+        "2": 1939,
+        "3": 88298,
+        "4": 3492097
+      }
+    },
+    "adjacent-kings": {
+      "fen": "8/8/8/3kK3/8/8/8/8 w - - 0 1",
+      "perft": {
+        "1": 7,
+        "2": 52,
+        "3": 397,
+        "4": 3064,
+        "5": 23836,
+        "6": 186304
+      }
+    },
+    "en-passant-blast": {
+      "fen": "rnbqkbnr/1pp1pppp/8/p2pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3",
+      "perft": {
+        "1": 31,
+        "2": 841,
+        "3": 25918,
+        "4": 725398
+      }
+    },
+    "pinned-but-regicidal": {
+      "fen": "4r3/8/2kb4/8/4N3/8/8/4K3 w - - 0 1",
+      "perft": {
+        "1": 6,
+        "2": 140,
+        "3": 1739,
+        "4": 44461,
+        "5": 493949
+      }
+    },
+    "own-king-in-blast": {
+      "fen": "4k3/3R4/3n4/2K5/8/8/8/8 w - - 0 1",
+      "perft": {
+        "1": 13,
+        "2": 96,
+        "3": 1523,
+        "4": 12614,
+        "5": 220156
+      }
+    },
+    "castling-through-blast": {
+      "fen": "r3k2r/pppppppp/8/8/8/8/PPPPPPPP/R3K2R w KQkq - 0 1",
+      "perft": {
+        "1": 25,
+        "2": 625,
+        "3": 15206,
+        "4": 369912
+      }
+    },
+    "promotion-race": {
+      "fen": "8/PPPk4/8/8/8/8/4pppp/4K3 w - - 0 1",
+      "perft": {
+        "1": 1,
+        "2": 21,
+        "3": 312,
+        "4": 6359,
+        "5": 108662
+      }
+    }
+  }
+}
