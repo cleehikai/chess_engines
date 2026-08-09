@@ -61,7 +61,10 @@
   .sq .piece.b { color: #1a1a1a; text-shadow: 0 0 2px #fff3; }
 
   .hint {
-    position: absolute; z-index: 3; pointer-events: none;
+    /* Centred explicitly: an absolutely positioned child of a flex container
+       falls back to its static position, which is not the square's centre. */
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 3; pointer-events: none;
     width: 30%; height: 30%; border-radius: 50%;
     background: rgba(0,0,0,.32);
   }
@@ -424,8 +427,9 @@ function showElo() {
   el.elo.textContent = level.elo;
   el.elo.className = "elo" + (level.measured ? "" : " unmeasured");
   el.eloDetail.textContent = level.measured
-    ? `${level.label}, ${level.nodes.toLocaleString()} nodes per move`
-    : `Run: lab.cli rate M1-alphabeta --nodes ${level.nodes}`;
+    ? `${level.nodes.toLocaleString()} nodes per move`
+      + (level.anchor ? " — anchors the scale" : "")
+    : "Run: lab.cli levels";
 }
 
 document.getElementById("new").onclick = newGame;

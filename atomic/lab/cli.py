@@ -153,6 +153,67 @@ def cmd_match(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_levels(args: argparse.Namespace) -> int:
+    """Calibrate a method's node-budget ladder — the UI's difficulty levels.
+
+    Why this exists rather than just rating each level on the FSF ladder: a
+    gauntlet rating depends on how far up the ladder the method got before
+    being shut out, so a *weaker* setting that survives to play more rungs can
+    out-rate a stronger one. Measured directly, M1 at 2k nodes rated 1366 +/- 88
+    while M1 at 64k rated 1254 +/- 167 — an ordering the head-to-head results
+    flatly contradict.
+
+    So this measures each level against one anchor level head-to-head and
+    chains the gaps, which is the same construction `calibrate` uses for the
+    Fairy-Stockfish rungs. The anchor's absolute rating still comes from the
+    ladder; only the *spacing* comes from here.
+    """
+    from .server import LEVELS
+
+    rungs = [nodes for _label, nodes in LEVELS]
+    anchor = args.anchor if args.anchor in rungs else rungs[0]
+
+    measured = rating.latest_ratings().get((args.method, f"{anchor}n"))
+    if measured is None:
+        print(
+            f"no ladder rating for {args.method} @ {anchor}n — run\n"
+            f"  lab.cli rate {args.method} --nodes {anchor} --games 40\n"
+            "first, so the chain has something to anchor to."
+        )
+        return 1
+    anchor_elo = measured["elo"]
+
+    levels = {anchor: {"elo": anchor_elo, "span": (measured["high"] - measured["low"]) / 2,
+                       "anchor": True, "games": measured["games"]}}
+    for nodes in rungs:
+        if nodes == anchor:
+            continue
+        a = arena.MethodPlayer(methods.build(args.method), methods.Budget(nodes=nodes))
+        b = arena.MethodPlayer(methods.build(args.method), methods.Budget(nodes=anchor))
+        print(f"\n{a.name} vs {b.name}")
+        match = arena.play_match(a, b, args.games, seed=args.seed, progress=not args.quiet)
+        print(f"  => {match}")
+        match.to_jsonl(config.RESULTS / "levels.jsonl")
+        delta = rating.rate([rating.Opponent(b.name, 0.0, match.score_a, len(match.games))])
+        levels[nodes] = {
+            "elo": anchor_elo + delta.elo,
+            "span": (delta.high - delta.low) / 2,
+            "anchor": False,
+            "games": delta.games,
+        }
+
+    rating.save_levels(
+        args.method, anchor,
+        dict(sorted(levels.items())),
+        f"{args.games} games/level vs {anchor}n, {time.strftime('%Y-%m-%d')}",
+    )
+    print(f"\nwritten to {rating.LEVELS_FILE}")
+    for nodes, level in sorted(levels.items()):
+        tag = "  <- anchor (absolute, from the ladder)" if level["anchor"] else ""
+        print(f"  {nodes:>9,} nodes  {level['elo']:6.0f} +/- {level['span']:3.0f} Elo{tag}")
+    return 0
+
+
 def cmd_ratings(args: argparse.Namespace) -> int:
     """Everything measured so far, on one scale."""
     ladder = rating.load_ladder()
@@ -172,12 +233,27 @@ def cmd_ratings(args: argparse.Namespace) -> int:
             f"  {method:<20} @{budget:<10} {rating.describe(row):<20}"
             f" {row['score']:>5}/{row['games']:<4}{note}"
         )
+    levels = rating.load_levels()
+    if levels:
+        print(f"\n=== {levels['method']} difficulty levels ({levels['note']}) ===")
+        for nodes, level in sorted(levels["levels"].items()):
+            tag = "  <- anchor" if level["anchor"] else ""
+            print(f"  {nodes:>9,} nodes  {level['elo']:6.0f} +/- {level['span']:3.0f} Elo{tag}")
+
     if not args.quiet:
         print(
             "\nThis scale is internal: the 64k-node rung is pinned at 2000 by"
             "\ndefinition. Only differences mean anything - do not compare these"
             "\nnumbers to Lichess or CCRL ratings."
         )
+        budgets = {method for method, _ in rows}
+        if any(sum(1 for m, _ in rows if m == method) > 1 for method in budgets):
+            print(
+                "\nNote: two gauntlet ratings of the *same* method at different"
+                "\nbudgets are not comparable. `gauntlet` stops climbing once a"
+                "\nmethod is shut out, so each budget faces a different rung set."
+                "\nUse the difficulty-level table above, or `match --nodes-b`."
+            )
     return 0
 
 
@@ -271,6 +347,13 @@ def main(argv: list[str] | None = None) -> int:
 
     sub.add_parser("ratings", help="show every rating measured so far")
 
+    p_lvl = sub.add_parser("levels", help="calibrate the UI's difficulty levels")
+    p_lvl.add_argument("method", nargs="?", default="M1-alphabeta",
+                       choices=sorted(methods.REGISTRY))
+    p_lvl.add_argument("--anchor", type=int, default=2_000,
+                       help="the level whose absolute rating anchors the chain")
+    p_lvl.add_argument("--games", type=int, default=60)
+
     p_play = sub.add_parser("play", help="play the engine in a browser")
     p_play.add_argument("--host", default="127.0.0.1")
     p_play.add_argument("--port", type=int, default=8770)
@@ -291,6 +374,7 @@ def main(argv: list[str] | None = None) -> int:
         "match": cmd_match,
         "ablate": cmd_ablate,
         "ratings": cmd_ratings,
+        "levels": cmd_levels,
         "play": cmd_play,
     }
     return handlers[args.command](args)

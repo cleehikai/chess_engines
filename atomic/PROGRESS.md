@@ -172,10 +172,41 @@ directly, against itself at 1k nodes, 60 games per point:
 | 1,024,000 | +585 ± 258 |
 
 M1 spans roughly 585 Elo from its weakest to its strongest setting, so the UI's
-difficulty levels are real. The lesson for the harness is that **a gauntlet
-against a much stronger ladder is the wrong instrument for questions about a
-weak method** — `match --nodes-b` and `ablate` are the right ones, and both
-exist now.
+difficulty levels are real.
+
+### Gauntlet ratings at different budgets are not comparable to each other
+
+This is a harness defect worth recording, because it silently invalidates the
+obvious way to build a difficulty menu. Rating M1 at each node budget against
+the ladder gives:
+
+| M1 nodes | gauntlet rating | games |
+|---|---|---|
+| 2,000 | **1366 ± 88** | 240 |
+| 4,000 | 1254 ± 178 | 40 |
+| 16,000 | 1296 ± 164 | 40 |
+| 64,000 | 1254 ± 167 | 60 |
+| 256,000 | 1520 ± 103 | 80 |
+| 1,024,000 | 1523 ± 108 | 60 |
+
+**M1 at 2k nodes out-rates M1 at 4k and at 64k**, which the head-to-head
+results above contradict outright. The cause is structural rather than
+statistical: `gauntlet` stops climbing once a method is shut out, so the rung
+set differs per budget, and a *weaker* setting that survives to play more rungs
+draws its estimate from different — and easier — opposition. The game counts
+in that table are a symptom, not a coincidence.
+
+Two consequences, both now implemented:
+
+- `lab.cli levels` calibrates the UI's difficulty ladder by chaining measured
+  head-to-head gaps from a single anchor, which is the same construction
+  `calibrate` already uses for the Fairy-Stockfish rungs. Only the anchor's
+  absolute value comes from a gauntlet; all the spacing is direct.
+- **A gauntlet against a much stronger ladder is the wrong instrument for any
+  question about a weak method.** `match --nodes-b` and `ablate` are the right
+  ones. The gauntlet remains correct for what it was built for — placing one
+  configuration on an absolute scale — and its numbers should be read as
+  "roughly 1250–1550, poorly identified", not compared with each other.
 
 ## Playing the engine
 

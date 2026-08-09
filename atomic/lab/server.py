@@ -74,20 +74,33 @@ class EngineHolder:
 def _levels() -> list[dict]:
     """The difficulty levels, annotated with a measured rating where one exists.
 
-    A level whose rating has not been measured says so rather than guessing.
-    Inventing a number here would quietly undermine the one thing this project
-    is careful about.
+    Ratings come from `lab.cli levels`, which chains head-to-head gaps from one
+    anchor, *not* from per-level gauntlets. Per-level gauntlet ratings are not
+    comparable to each other: a rating depends on how far up the FSF ladder the
+    method survived, so a weaker setting that reaches more rungs can out-rate a
+    stronger one. Measured on this machine, M1 at 2k nodes gauntleted to
+    1366 ± 88 and M1 at 64k to 1254 ± 167, an ordering that direct head-to-head
+    play contradicts outright. Displaying that in a difficulty menu would be
+    worse than displaying nothing.
+
+    A level with no measurement says so rather than guessing.
     """
-    measured = rating.latest_ratings()
+    data = rating.load_levels()
+    chained = data.get("levels", {}) if data.get("method") == "M1-alphabeta" else {}
     out = []
     for label, nodes in LEVELS:
-        row = measured.get(("M1-alphabeta", f"{nodes}n"))
+        level = chained.get(nodes)
         out.append(
             {
                 "label": label,
                 "nodes": nodes,
-                "elo": rating.describe(row) if row else "not yet measured",
-                "measured": row is not None,
+                "elo": (
+                    f"{level['elo']:.0f} +/- {level['span']:.0f} Elo"
+                    if level
+                    else "not yet measured"
+                ),
+                "measured": level is not None,
+                "anchor": bool(level and level["anchor"]),
             }
         )
     return out

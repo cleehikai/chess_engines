@@ -132,6 +132,14 @@ JavaScript, where it would drift.
 Difficulty levels are node budgets, each shown with its **measured** rating. A
 level that has not been rated yet says so instead of displaying a guess.
 
+Those ratings come from `lab.cli levels`, which chains head-to-head gaps from
+one anchor rather than rating each level on the ladder separately. Per-level
+gauntlet ratings turn out not to be comparable to each other — `gauntlet` stops
+climbing once a method is shut out, so each budget faces a different rung set,
+and a weaker setting that survives to play more rungs can out-rate a stronger
+one. Measured here, M1 at 2k nodes gauntleted *above* M1 at 64k. See
+`PROGRESS.md`.
+
 ## Reading order
 
 1. `docs/research-notes.md` — the rules and what each one does to engine design,

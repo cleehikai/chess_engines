@@ -152,6 +152,7 @@ def rate(opponents: Sequence[Opponent]) -> Rating:
 
 
 RATINGS_FILE = config.RESULTS / "ratings.jsonl"
+LEVELS_FILE = config.RESULTS / "method_levels.json"
 
 
 def load_ratings() -> list[dict]:
@@ -175,6 +176,40 @@ def load_ratings() -> list[dict]:
 def latest_ratings() -> dict[tuple[str, str], dict]:
     """The most recent rating for each (method, budget), keyed by that pair."""
     return {(row["method"], row["budget"]): row for row in load_ratings()}
+
+
+def save_levels(method: str, anchor_nodes: int, levels: dict[int, dict], note: str) -> None:
+    LEVELS_FILE.parent.mkdir(parents=True, exist_ok=True)
+    LEVELS_FILE.write_text(
+        json.dumps(
+            {
+                "method": method,
+                "anchor_nodes": anchor_nodes,
+                "note": note,
+                "levels": {str(k): v for k, v in levels.items()},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
+def load_levels() -> dict:
+    """A method's node-budget ladder, or `{}` if it has not been calibrated.
+
+    Separate from `ratings.jsonl` on purpose. A gauntlet rating is a point
+    estimate against whichever rungs the method survived long enough to play,
+    so two gauntlets at different budgets are not comparable to each other —
+    a weaker setting that happens to reach more rungs can out-rate a stronger
+    one. Chaining measured head-to-head gaps from a single anchor, which is
+    exactly how the Fairy-Stockfish ladder is built, does not have that
+    failure mode.
+    """
+    if not LEVELS_FILE.exists():
+        return {}
+    data = json.loads(LEVELS_FILE.read_text(encoding="utf-8"))
+    data["levels"] = {int(k): v for k, v in data["levels"].items()}
+    return data
 
 
 def describe(row: dict) -> str:
