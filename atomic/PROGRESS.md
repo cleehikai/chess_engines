@@ -212,8 +212,22 @@ Two consequences, both now implemented:
 
 ```powershell
 py -3.13 -m lab.cli ratings   # every Elo measured so far, on one scale
+py -3.13 -m lab.cli levels    # calibrate the difficulty ladder (chained)
 py -3.13 -m lab.cli play      # browser UI, http://127.0.0.1:8770
 ```
+
+The calibrated difficulty levels, chained from the 2k anchor at 60 games each:
+
+| Level | Nodes | Elo |
+|---|---|---|
+| Casual | 2,000 | 1366 ± 88 (anchor) |
+| Club | 16,000 | 1691 ± 131 |
+| Strong | 64,000 | 1704 ± 135 |
+| Full strength | 1,024,000 | 1951 ± 258 |
+
+Monotonic, unlike the per-budget gauntlet ratings. Club and Strong are within
+each other's intervals, which is honest rather than tidy: 16k to 64k is only
+two doublings and M1's returns to compute are shallow in that range.
 
 The UI is served by `lab/server.py` (stdlib `http.server`, no new dependencies)
 with `ui/index.html` as its only page. The server is the referee: it owns the
