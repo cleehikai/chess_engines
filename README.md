@@ -109,3 +109,11 @@ style/    profiles.py  shaping.py
 ui/       gui.py  uci.py
 run.py    launches the GUI
 ```
+
+## Working in this repo (for AI assistants)
+
+This repo has a prebuilt **graphify** knowledge graph in `graphify-out/`. When
+answering questions about the codebase — architecture, how files relate, "where
+does X live", "how does the NNUE pipeline flow" — query that existing graph
+first (via the graphify skill) rather than blind grep. For mechanical chores
+(git, editing files, running commands), skip graphify and just do the work.

@@ -15,6 +15,7 @@ import argparse
 import chess
 
 from engine.board import Engine
+from tools.estimate import announce
 
 
 def _mk(style: str, nnue: str | None) -> Engine:
@@ -56,6 +57,13 @@ def main() -> None:
     b_ckpt = args.b_nnue
     a_name = args.a_name if (args.a_nnue or args.b_nnue) else "nnue"
     b_name = args.b_name if (args.a_nnue or args.b_nnue) else "hand"
+
+    # A move by one side costs ~movetime; a typical game is ~80 plies, so
+    # ~80 * movetime per game (one side thinks per ply).
+    est_s = args.games * 80 * args.movetime
+    announce(
+        f"Match ({args.games} games)", est_s,
+        f"{args.games} games x ~80 plies x {args.movetime*1000:.0f}ms/move")
 
     score = {a_name: 0, b_name: 0, "draw": 0}
     for g in range(args.games):

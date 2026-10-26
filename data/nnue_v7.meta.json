@@ -1,0 +1,14 @@
+{
+  "batch": 8192,
+  "best_val": 0.02044,
+  "epochs": 45,
+  "lambda": 0.8,
+  "lr": 0.001,
+  "min_delta": 0.0001,
+  "patience": 8,
+  "positions": 9583942,
+  "shards": "data/train[45].shard*.tsv",
+  "trained_at": "2026-07-09 11:44:21",
+  "trained_epoch": 31,
+  "val_split": "fen-hash"
+}

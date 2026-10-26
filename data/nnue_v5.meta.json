@@ -1,0 +1,11 @@
+{
+  "batch": 8192,
+  "best_val": 0.01823,
+  "epochs": 60,
+  "lambda": 0.8,
+  "lr": 0.001,
+  "positions": 3139431,
+  "shards": "data/train3.shard*.tsv",
+  "trained_at": "2026-07-07 10:35:54",
+  "trained_epoch": 39
+}

@@ -10,7 +10,11 @@ from typing import Optional
 
 import chess
 
-from engine.evaluate import EvalFeatures, evaluate as base_evaluate
+from engine.evaluate import (
+    EvalFeatures,
+    cheap_features,
+    evaluate as base_evaluate,
+)
 from engine.search import Searcher, SearchInfo
 from style.profiles import StyleProfile, PROFILES, DEFAULT_PROFILE
 from style.shaping import make_shaped_eval
@@ -56,12 +60,20 @@ class Engine:
     def _build_eval(self):
         if self._nnue is None:
             return make_shaped_eval(base_evaluate, self._profile)
-        # NNUE score + hand-crafted features (for the style layer).
         nnue = self._nnue
 
+        # When the profile does no shaping (e.g. `balanced`), the style layer
+        # never touches EvalFeatures, so computing them per node is pure waste.
+        # Previously we called the full hand `evaluate()` on EVERY NNUE node just
+        # to obtain features that were then discarded -- profiling showed that
+        # hand eval was ~66% of the NNUE search's time. Hand the searcher the raw
+        # NNUE score directly in that case; when shaping IS active, supply only
+        # the cheap bitboard features (no PST loop) the style layer reads.
+        if self._profile.max_shaping_pawns <= 0 and self._profile.contempt == 0:
+            return nnue.eval_cp
+
         def base_eval_with_feats(board: chess.Board):
-            _, feats = base_evaluate(board)
-            return nnue.eval_cp(board), feats
+            return nnue.eval_cp(board), cheap_features(board)
 
         return make_shaped_eval(base_eval_with_feats, self._profile)
 
