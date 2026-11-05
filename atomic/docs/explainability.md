@@ -425,6 +425,91 @@ exists. The route there is a small evaluation built from named atomic
 concepts and fitted to agree with FSF (Stage C). It would explain FSF's
 quiet preferences in its own terms without having to play any games itself.
 
+## 7. The positional layer: a readable concept model (2026-11-05)
+
+This fills the gap Stage A leaves. When no short forcing line separates the
+engine's move from yours, the explanation used to stop at "positional".
+`trainer/concepts.py` adds a second answer for those cases. It is built from
+16 named atomic concepts, each one a count you can check on the board, and
+each counted as side to move minus opponent:
+
+| Concept | What it counts |
+|---|---|
+| pawns … queens | material, piece by piece |
+| loose material | the most material one capture could win, net of the blast |
+| pieces beside their own king | non-pawns next to the king: a capture on any of them explodes it |
+| attacked pieces beside their own king | the same, but only those an enemy piece attacks, pawns included |
+| attacks around the other king | pressure on the squares next to the enemy king |
+| pawns beside their own king | pawns survive blasts, but a capture on one still explodes the king |
+| pieces standing side by side | adjacent pairs of non-pawns: one capture takes both |
+| moves available, minor pieces developed, attacks on the centre, pawn advance, castling rights | the ordinary positional counts |
+
+The weights come from a ridge regression against the engine's own
+evaluations. Tactical positions are left out of the fit, because they are
+what Stage A already covers: positions in check, positions where the side to
+move has a capture that wins material or explodes the king, and mates.
+When a move is "positional", the explainer compares the position after the
+engine's move and the reply with the position after yours and the reply. It
+names the concepts that make up the difference, each with its share in pawns.
+
+It only offers them as *the* reason when two conditions hold:
+
+- **It agrees with the engine** about which move is better. Otherwise it says
+  "the concept model rates yours as good or better. Whatever the engine
+  dislikes is outside these concepts".
+- **The concepts cover at least 35% of the engine's preference.** Otherwise
+  they are offered as a pointer, with "most of the objection is something
+  these concepts do not measure, often a deeper tactic". A decisive
+  preference (9 pawns or more) is always treated this way.
+
+Each attribution states the fit quality. It also says when the model was
+fitted on a different engine from the one analysing.
+
+### Results in the build container
+
+The fit used Fairy-Stockfish's handcrafted eval, labelling 4,927 positional
+positions from 600 self-play games at 60k nodes:
+
+- **Held-out R² 0.66.** The model orders two held-out positions the way the
+  engine does **83%** of the time.
+- On 76 random moves that lose 10% or more: **45 refuted** by a forcing line
+  and **31 positional (41%)**. The concept model **agreed with the engine on
+  26 of the 29** positional cases it was applied to.
+- **A bug the fit exposed.** The first fit gave "attacked pieces beside your
+  king" a weight of **+2.6 pawns**, the wrong sign. The raw data said
+  otherwise: one such piece averaged −1.6 pawns, two averaged −3.3. Two
+  features were counting the same fact. A capture that explodes the king was
+  also being scored as 12 pawns of "loose material", and the fit split that
+  fact into opposite-sign weights. With king explosions taken out of loose
+  material, the weight is −0.35 and every other weight is sensible. That is
+  the reason to keep the model linear: a wrong sign is visible.
+- **A result that matches M1.** "Pieces beside their own king" fits to
+  **+0.02**, effectively zero. That is the same thing the M1 ablation found
+  from the other direction: static blast-radius king safety adds nothing once
+  the search covers captures.
+
+**The shipped `data/concepts_atomic.json` is that handcrafted-eval fit.** On
+your machine, refit it to the net from the analysis cache you already have:
+
+    py -3.13 -m trainer.cli concepts fit     # from cached analyses
+    py -3.13 -m trainer.cli concepts show    # weights and fit quality
+
+Expect a lower R² than 0.66. The net is less linear than the handcrafted
+eval, and that number is the honest measure of how much of the net's
+positional judgement these concepts can carry.
+
+### What comes next
+
+- **Your blind-spot rate.** Run *Why is X bad?* over your own blunders and
+  count three outcomes: refuted, positional-explained, and positional
+  outside the concepts. The third group is the list of concepts this model
+  still lacks.
+- **New concepts from that list.** Each one is a function in `_side` and a
+  refit away. Keep a concept only if it raises the pair accuracy on held-out
+  positions.
+- Stage B (an LLM for wording) still has not been needed: the templates read
+  well enough. Stage D still waits on an atomic transformer.
+
 ## Sources
 
 - Queen: arXiv [2610.03695](https://arxiv.org/abs/2610.03695) · code

@@ -52,6 +52,7 @@ const KIND_LABEL = {
   defusal: "out of the blast",
   "self-blast": "own pieces",
   regicidal: "atomic legality",
+  concepts: "concepts",
 };
 
 export class ExplainPanel {
@@ -148,6 +149,12 @@ export class ExplainPanel {
             ? "Starts from a position where the other side has passed: it shows the threat, not a game line."
             : "Step through this line on the board.",
         }, reason.hypothetical ? "Show the threat ▸" : "Show on board ▸"));
+      } else if (reason.contributions && reason.contributions.length) {
+        row.append(el("div", { class: "concept-bars" + (reason.agrees ? "" : " disagree") },
+          reason.contributions.map((part) => el("div", { class: "concept-bar" },
+            el("span", { class: "mono " + (part.cp >= 0 ? "good-text" : "bad-text") },
+              `${part.cp >= 0 ? "+" : "−"}${(Math.abs(part.cp) / 100).toFixed(1)}`),
+            el("span", {}, part.text.replace(/\s*\([+−-]?[\d.]+\)$/, ""))))));
       } else if (reason.squares && reason.squares.length) {
         row.addEventListener("mouseenter", () => this.flash(reason.squares));
         row.addEventListener("mouseleave", () => this.unflash());

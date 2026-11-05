@@ -10,6 +10,10 @@ data/dumps/
 # a fresh clone judges moves correctly instead of falling back to the
 # standard-chess curve until someone spends 40 minutes refitting.
 
+# Also committed on purpose: data/concepts_atomic.json, for the same reason —
+# sixteen weights the explainer reads at runtime. Refit with
+# `trainer.cli concepts fit`.
+
 # Measured output — regenerate rather than commit.
 results/
 

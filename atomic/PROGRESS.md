@@ -35,6 +35,7 @@ measured Elo scale anchored to Fairy-Stockfish + atomic NNUE.
 | Puzzle scraper over the rated Lichess dumps | Done — two-tier funnel, deduplicated by position |
 | Analysis board, arrow-key replay, improvement report | Done |
 | "Why?" explanations: refutation, threats via null move, blast facts | Done — `trainer/explain.py`, Play + Review tabs, `cli explain` (`docs/explainability.md` §6) |
+| Concept model for positional moves (16 atomic concepts, fitted to the engine) | Done — HCE fit R² 0.66, 83% pair accuracy; refit on the net with `cli concepts fit` (§7) |
 
 ## Measured so far
 

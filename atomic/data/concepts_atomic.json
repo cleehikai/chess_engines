@@ -1,0 +1,47 @@
+{
+  "weights": [
+    186.16,
+    319.5,
+    356.99,
+    461.45,
+    904.45,
+    34.56,
+    1.89,
+    -35.2,
+    86.84,
+    -36.48,
+    -26.6,
+    11.05,
+    9.07,
+    19.71,
+    72.93,
+    18.71
+  ],
+  "intercept": 79.79,
+  "names": [
+    "pawns",
+    "knights",
+    "bishops",
+    "rooks",
+    "queens",
+    "loose",
+    "king_bombs",
+    "king_fuses",
+    "king_pressure",
+    "king_pawns",
+    "clusters",
+    "mobility",
+    "developed",
+    "centre",
+    "pawn_advance",
+    "castling"
+  ],
+  "r2": 0.6605,
+  "pairwise": 0.8291,
+  "samples": 4927,
+  "provenance": {
+    "engine": "fsf14-hce-atomic",
+    "source": "self-play, 600 games, 60k nodes per position, Fairy-Stockfish's handcrafted eval (no NNUE)",
+    "fitted_at": "2026-11-05"
+  }
+}

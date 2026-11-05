@@ -41,6 +41,7 @@ import chess.variant
 from . import (
     analysis,
     book,
+    concepts,
     difficulty,
     dump,
     endgames,
@@ -301,6 +302,62 @@ def cmd_explain(args: argparse.Namespace) -> int:
             sections.reverse()
     for heading, reasons in sections:
         show(heading, reasons)
+    return 0
+
+
+def cmd_concepts_fit(args: argparse.Namespace) -> int:
+    """Fit the readable concept model to the engine's own evaluations."""
+    if args.play:
+        from lab import fsf
+
+        cfg = fsf.FsfConfig(nodes=args.nodes, threads=1, hash_mb=64, use_nnue=not args.hce)
+        with fsf.open_engine(cfg) as engine:
+            def search(fen: str) -> tuple[int | None, int | None, str | None]:
+                info = engine.analyse(chess.variant.AtomicBoard(fen), cfg.limit)
+                score = info["score"].relative
+                pv = info.get("pv") or []
+                return score.score(), score.mate(), pv[0].uci() if pv else None
+
+            def progress(done: int) -> None:
+                print(f"\r  self-play games: {done}/{args.play}", end="", flush=True)
+
+            samples = concepts.samples_from_play(
+                search, games=args.play, seed=args.seed, on_progress=progress)
+        print()
+        engine_id = f"fsf14-{'hce' if args.hce else 'nnue'}-atomic"
+        source = f"self-play, {args.play} games, {args.nodes} nodes"
+    else:
+        engine_id = analysis.ENGINE_ID
+        with store.open_db() as db:
+            samples = concepts.samples_from_cache(db, engine_id, limit=args.limit)
+        source = "the trainer's analysis cache"
+    print(f"  {len(samples)} positional positions from {source}")
+    try:
+        model = concepts.fit(samples, seed=args.seed, provenance={
+            "engine": engine_id, "source": source,
+            "fitted_at": time.strftime("%Y-%m-%d"),
+        })
+    except ValueError as exc:
+        print(f"  {exc}. Analyse some games first (`trainer.cli analyse`), "
+              "or label self-play positions with `--play 300`.")
+        return 1
+    print(model.describe())
+    for row in concepts.table(model):
+        print(row)
+    concepts.save(model)
+    print(f"\nsaved to {concepts.MODEL_PATH}")
+    return 0
+
+
+def cmd_concepts_show(args: argparse.Namespace) -> int:
+    model = concepts.load()
+    if model is None:
+        print("no concept model yet: run `trainer.cli concepts fit`")
+        return 1
+    print(model.describe())
+    print(f"  provenance: {model.provenance}")
+    for row in concepts.table(model):
+        print(row)
     return 0
 
 
@@ -1309,6 +1366,20 @@ def main(argv: list[str] | None = None) -> int:
     p_ex.add_argument("--versus", help="compare against this move instead of the second best")
     p_ex.add_argument("--nodes", type=int, default=300_000, help="per search")
     p_ex.set_defaults(func=cmd_explain)
+
+    p_con = sub.add_parser("concepts", help="the readable concept model behind positional reasons")
+    con = p_con.add_subparsers(dest="concepts_cmd", required=True)
+    p_cf = con.add_parser("fit", help="fit it to the engine's evaluations")
+    p_cf.add_argument("--limit", type=int, default=None,
+                      help="cap the positions read from the cache")
+    p_cf.add_argument("--play", type=int, default=0,
+                      help="instead of the cache, label positions from N self-play games")
+    p_cf.add_argument("--nodes", type=int, default=100_000, help="per position, with --play")
+    p_cf.add_argument("--hce", action="store_true", help="with --play: FSF's handcrafted eval")
+    p_cf.add_argument("--seed", type=int, default=0)
+    p_cf.set_defaults(func=cmd_concepts_fit)
+    p_cs = con.add_parser("show", help="the fitted weights")
+    p_cs.set_defaults(func=cmd_concepts_show)
 
     p_worst = sub.add_parser("worst", help="your biggest mistakes across all games")
     p_worst.add_argument("--limit", type=int, default=20)

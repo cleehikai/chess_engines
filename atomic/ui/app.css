@@ -629,3 +629,7 @@ button.small { padding: 3px 9px; font-size: 12px; }
   .reason { grid-template-columns: 1fr; }
   .reason button { grid-column: 1; }
 }
+.concept-bars { grid-column: 2; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.concept-bars.disagree { opacity: .7; }
+.concept-bar { display: grid; grid-template-columns: 40px 1fr; gap: 8px; color: var(--dim); }
+@media (max-width: 520px) { .concept-bars { grid-column: 1; } }

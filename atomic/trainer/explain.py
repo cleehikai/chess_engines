@@ -40,6 +40,7 @@ fake.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Sequence
 from typing import Any
 
@@ -49,7 +50,7 @@ import chess.variant
 from lab.methods import ATOMIC_PIECE_VALUES
 from lab.rules import explosion_squares
 
-from . import themes, winrate
+from . import analysis, concepts, themes, winrate
 from .analysis import Line
 
 #: `(fen, multipv) -> lines`, best first, scored for the side to move.
@@ -511,6 +512,109 @@ def _score_move(
     return 100.0 - reply.win_pct(model), tuple(reply.pv or (reply.uci,)), reply.mate
 
 
+#: Plies of each line played before the concept model compares the two
+#: positions: the move and the engine's reply to it. Far enough that the
+#: position has answered the move, near enough that it is still about it.
+CONCEPT_PLIES = 2
+
+#: A concept contribution smaller than this, in centipawns, is not named.
+CONCEPT_MIN = 10
+
+#: An engine preference this large is a won-or-lost difference, which no
+#: positional count explains; its size in pawns is an artefact of the win%
+#: curve's tail and is not shown.
+DECISIVE_CP = 900
+
+#: The share of the engine's preference the concepts must cover before they
+#: are offered as the explanation rather than as a pointer.
+COVERED = 0.35
+
+
+def _cp_of(win: float, model: winrate.WinModel) -> float:
+    """The evaluation a win% corresponds to, by the fitted curve."""
+    p = min(max(win, 0.5), 99.5) / 100.0
+    return (math.log(p / (1.0 - p)) - model.a) / model.k
+
+
+def _endpoint(fen: str, ucis: Sequence[str]) -> tuple[chess.variant.AtomicBoard, str]:
+    plies = walk(fen, ucis, CONCEPT_PLIES)
+    board = chess.variant.AtomicBoard(plies[-1]["fen_after"] if plies else fen)
+    return board, _line_text(plies)
+
+
+def concept_reason(
+    cm: concepts.ConceptModel,
+    fen: str,
+    line_a: Sequence[str],
+    line_b: Sequence[str],
+    gap_cp: float,
+    names: tuple[str, str],
+) -> dict[str, Any] | None:
+    """What the concept model says separates move A from move B.
+
+    `gap_cp` is how much better the engine says A is, for the side to move at
+    `fen`. The model compares the positions after each move and the reply to
+    it. It is only allowed to explain when it agrees with the engine about
+    which is better; when it does not, it says so, because a confident
+    attribution pointing the wrong way is worse than none.
+    """
+    board = chess.variant.AtomicBoard(fen)
+    pov = board.turn
+    end_a, text_a = _endpoint(fen, line_a)
+    end_b, text_b = _endpoint(fen, line_b)
+    if end_a.is_game_over(claim_draw=True) or end_b.is_game_over(claim_draw=True):
+        return None
+    total, parts = concepts.attribute(cm, end_a, end_b, pov)
+    side, other = colour(pov), colour(not pov)
+    a, b = names
+    fitted_on = cm.provenance.get("engine")
+    stale = (
+        f" It was fitted on {fitted_on}, not the engine analysing here: run "
+        "`trainer.cli concepts fit` to fit it to yours."
+        if fitted_on and fitted_on != analysis.ENGINE_ID else ""
+    )
+    fit = (
+        f"(The concept model explains {100 * cm.r2:.0f}% of the engine's evaluations and "
+        f"orders two positions as the engine does {100 * cm.pairwise:.0f}% of the time."
+        f"{stale})"
+    )
+    shown = [
+        {"name": c.name, "cp": round(c.cp), "text": c.sentence(side, other)}
+        for c in parts if abs(c.cp) >= CONCEPT_MIN
+    ][:6]
+    compared = f"Comparing {text_a} with {text_b}"
+    if total <= 0:
+        return _reason(
+            "concepts",
+            f"{compared}, the concept model rates {b} as good or better "
+            f"({total / 100:+.1f}). Whatever the engine dislikes about {b} is outside "
+            f"these concepts. {fit}",
+            contributions=shown, agrees=False)
+    support = [c for c in parts if c.cp >= CONCEPT_MIN][:3]
+    against = next((c for c in parts if c.cp <= -max(CONCEPT_MIN, 0.4 * total)), None)
+    listed = "; ".join(c.sentence(side, other) for c in support)
+    if gap_cp >= DECISIVE_CP or total < COVERED * gap_cp:
+        # Pointing the right way is not the same as explaining it. When the
+        # concepts cover a sliver of a large preference, the honest reading is
+        # that the reason is something they do not measure.
+        size = "a decisive" if gap_cp >= DECISIVE_CP else f"a {gap_cp / 100:.1f}-pawn"
+        text = (
+            f"{compared}, the concepts agree with the engine but cover only "
+            f"{total / 100:.1f} pawns of {size} preference: {listed}. Most of the "
+            f"engine's objection to {b} is something these concepts do not measure, "
+            "often a tactic deeper than the line shown. "
+        )
+        return _reason("concepts", text + fit, contributions=shown, agrees=True, covered=False)
+    share = "more than cover" if total >= gap_cp else f"account for {total / 100:.1f} of"
+    text = (
+        f"{compared}, in terms you can count on the board: {listed}. Together these "
+        f"{share} the engine's {gap_cp / 100:.1f}-pawn preference for {a}."
+        + (f" Against it: {against.sentence(side, other)}." if against else "")
+        + f" {fit}"
+    )
+    return _reason("concepts", text, contributions=shown, agrees=True, covered=True)
+
+
 def _reason(kind: str, text: str, *, line=None, start_fen=None, squares=None, **extra) -> dict:
     """One reason. `hypothetical` marks a line that starts from a pass, so the
     page can say its first position never happened."""
@@ -527,6 +631,7 @@ def explain(
     move: str | None = None,
     versus: str | None = None,
     model: winrate.WinModel | None = None,
+    concept_model: concepts.ConceptModel | None | str = "auto",
 ) -> dict[str, Any]:
     """Explain the engine's move here, or why `move` is worse than it.
 
@@ -536,6 +641,8 @@ def explain(
       the engine's move does instead.
     """
     model = model or winrate.load()
+    if concept_model == "auto":
+        concept_model = concepts.load()
     board = chess.variant.AtomicBoard(fen)
     if board.is_game_over(claim_draw=True):
         return {"over": True, "fen": fen, "result": board.result(claim_draw=True)}
@@ -691,6 +798,14 @@ def explain(
                 "plies, or in the evaluation, not in a tactic."
             )
         why.append(_reason(kind, text.strip(), line=refutation, start_fen=fen))
+        if kind == "positional" and concept_model is not None and other_mate is None:
+            gap = _cp_of(best_win, model) - _cp_of(other_win, model)
+            extra = concept_reason(
+                concept_model, fen, best.pv or (best.uci,), (other, *cont), gap,
+                (best_san, other_san),
+            )
+            if extra is not None:
+                why.append(extra)
         for note in notes(board, chess.Move.from_uci(other)):
             if note["kind"] == "self-blast":
                 why.append(_reason(note["kind"], note["text"], squares=note["squares"]))
@@ -728,6 +843,7 @@ def explain(
         "reasons": reasons,
         "alternative": alternative,
         "summary": summary,
+        "concept_model": concept_model.describe() if concept_model else None,
     }
 
 
@@ -736,7 +852,7 @@ def explain(
 #: line is usually just the best of what remains once the threat is stopped.
 ORDER = {
     kind: rank for rank, kind in enumerate(
-        ["wins", "check", "parries", "threatens", "plan",
+        ["wins", "check", "parries", "threatens", "plan", "concepts",
          "regicidal", "connected-kings", "defusal", "self-blast"]
     )
 }
