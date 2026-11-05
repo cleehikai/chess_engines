@@ -4,6 +4,8 @@ data/*.nnue
 data/*.pt
 data/*.sqlite
 data/dumps/
+# Optional Lichess OAuth token; never commit it.
+data/lichess_token
 
 # NOT ignored, on purpose: data/winrate_atomic.json. It is measured output, but
 # the trainer needs it at runtime and it is three numbers — committing it means

@@ -23,8 +23,22 @@ WHEELS = CORE / "target" / "wheels"
 def _in_virtualenv() -> bool:
     """`maturin develop` only works inside a venv/conda env; it errors out
     otherwise. On a global Python we build a wheel and pip-install it instead,
-    which works everywhere."""
-    return bool(os.environ.get("VIRTUAL_ENV") or os.environ.get("CONDA_PREFIX"))
+    which works everywhere.
+
+    The environment variable alone is not enough: a conda shell keeps
+    `CONDA_PREFIX` set while `py -3.13` may still be a *different* interpreter,
+    and `maturin develop` would then install into the conda env instead of the
+    one running this script. Check that the running interpreter is actually
+    inside the environment before choosing `develop`.
+    """
+    prefix = os.environ.get("VIRTUAL_ENV") or os.environ.get("CONDA_PREFIX")
+    if not prefix:
+        return False
+    try:
+        Path(sys.executable).resolve().relative_to(Path(prefix).resolve())
+    except ValueError:
+        return False
+    return True
 
 
 def _ensure_cargo_on_path() -> bool:

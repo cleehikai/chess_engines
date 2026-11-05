@@ -2003,6 +2003,8 @@ async function viewPlay(query) {
   }));
 
   const boardHost = el("div", { class: "board-lg" });
+  const playerTop = el("div", { class: "player" });
+  const playerBottom = el("div", { class: "player" });
   const status = el("div", { class: "verdict" }, "—");
   const evalBox = el("div", { class: "sub" }, "");
   const history = el("div", { class: "movelist" });
@@ -2020,6 +2022,23 @@ async function viewPlay(query) {
 
   const board = new Board(boardHost, { onMove: (uci) => play(uci) });
   board.setFlipped(side === "black");
+
+  function fillPlayer(node, name, note, colour) {
+    node.textContent = "";
+    node.append(
+      el("div", { class: "who" },
+        el("span", { class: "dot" + (colour === "black" ? " black" : "") }),
+        el("span", { class: "name" }, name)),
+      el("div", { class: "meta" }, note));
+  }
+
+  function renderPlayers() {
+    const level = opponentOf();
+    const you = sideSelect.value;
+    const engine = you === "white" ? "black" : "white";
+    fillPlayer(playerTop, level.label, level.detail, engine);
+    fillPlayer(playerBottom, "You", titleCase(you), you);
+  }
 
   function myTurn() {
     return state && !state.over && !busy && state.turn === sideSelect.value;
@@ -2101,6 +2120,7 @@ async function viewPlay(query) {
       : await api("/api/new", {});
     board.setFlipped(sideSelect.value === "black");
     board.setState(state);
+    renderPlayers();
     updateStatus();
     if (!state.over && state.turn !== sideSelect.value) await engineMove();
   }
@@ -2128,7 +2148,8 @@ async function viewPlay(query) {
           + "Fairy-Stockfish with the atomic NNUE net at full strength, which is "
           + "the gold standard everything else here is measured against."),
     el("div", { class: "split" },
-      el("div", { class: "wide", style: "flex:0 0 auto" }, boardHost),
+      el("div", { class: "wide", style: "flex:0 0 auto" },
+        el("div", { class: "round" }, playerTop, boardHost, playerBottom)),
       el("div", { class: "side" },
         el("div", { class: "card" },
           el("h2", {}, "Status"), status, evalBox,
@@ -2154,6 +2175,7 @@ async function viewPlay(query) {
             + "sits above the top of its own scale by construction.")),
         el("div", { class: "card" }, el("h2", {}, "Moves"), history))));
 
+  levelSelect.onchange = renderPlayers;
   sideSelect.onchange = () => reset(startFen);
   await reset(startFen);
   return wrap;

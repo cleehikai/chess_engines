@@ -44,6 +44,29 @@ const DRAG_SLOP = 4;
 
 const FILES = "abcdefgh";
 
+/** Unique prefixes so several boards on one page never share element ids. */
+let boardCount = 0;
+
+const PIECE_NAME = {
+  K: "king", Q: "queen", R: "rook", B: "bishop", N: "knight", P: "pawn",
+};
+
+/** What a screen reader says for a square. */
+function squareLabel(name, letter) {
+  if (!letter) return name;
+  const colour = letter === letter.toUpperCase() ? "white" : "black";
+  return `${name}, ${colour} ${PIECE_NAME[letter.toUpperCase()]}`;
+}
+
+/** The king of the side to move, so "check" can be shown on the board. */
+function kingSquare(pieces, turn) {
+  const king = turn === "black" ? "k" : "K";
+  for (const [square, letter] of Object.entries(pieces)) {
+    if (letter === king) return square;
+  }
+  return null;
+}
+
 export function parseFen(fen) {
   const rows = fen.split(" ")[0].split("/");
   const pieces = {};
@@ -100,6 +123,13 @@ export class Board {
 
     this.grid = document.createElement("div");
     this.grid.className = "board";
+    this.grid.tabIndex = 0;
+    this.grid.setAttribute("role", "grid");
+    this.grid.setAttribute(
+      "aria-label",
+      "Atomic chess board. Arrow keys move the cursor, Enter selects or plays, "
+        + "Escape cancels.",
+    );
     this.svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
     this.svg.setAttribute("class", "arrows");
     this.svg.setAttribute("viewBox", "0 0 8 8");
@@ -112,10 +142,20 @@ export class Board {
     this.drag = null;      // {from, piece, node, moved} while a piece is held
     this.press = null;     // what `pointerdown` decided, until `pointerup`
 
+    this.cursor = null;    // keyboard square cursor
+    this.uid = `board-${++boardCount}`;
+
     this.grid.addEventListener("pointerdown", (event) => this._down(event));
     this.grid.addEventListener("pointermove", (event) => this._move(event));
     this.grid.addEventListener("pointerup", (event) => this._up(event));
     this.grid.addEventListener("pointercancel", () => this._cancelDrag());
+    this.grid.addEventListener("keydown", (event) => this._key(event));
+    this.grid.addEventListener("focus", () => {
+      if (!this.cursor && this.state) {
+        this.cursor = this.flipped ? "e7" : "e2";
+        this.render();
+      }
+    });
     // A held piece must not double as a text selection or an image drag.
     this.grid.addEventListener("dragstart", (event) => event.preventDefault());
   }
@@ -153,49 +193,116 @@ export class Board {
     const last = this.state.last;
     const targets = this.selected ? (this.state.legal[this.selected] || []) : [];
     const targetSquares = new Set(targets.map((m) => m.slice(2, 4)));
+    const inCheck = this.state.check ? kingSquare(pieces, this.state.turn) : null;
 
     this.grid.textContent = "";
-    ranks.forEach((rank, r) => files.forEach((file, f) => {
-      const name = file + rank;
-      const sq = document.createElement("div");
-      sq.className = "sq " + ((r + f) % 2 === 0 ? "light" : "dark");
-      sq.dataset.square = name;
+    this.grid.setAttribute(
+      "aria-label",
+      `Atomic chess board. ${this.state.turn === "black" ? "Black" : "White"} to move`
+        + (this.state.check ? ", in check" : "")
+        + ". Arrow keys move the cursor, Enter selects or plays, Escape cancels.",
+    );
+    if (this.cursor) {
+      this.grid.setAttribute("aria-activedescendant", `${this.uid}-${this.cursor}`);
+    } else {
+      this.grid.removeAttribute("aria-activedescendant");
+    }
+    ranks.forEach((rank, r) => {
+      const row = document.createElement("div");
+      row.className = "row-cells";
+      row.setAttribute("role", "row");
+      files.forEach((file, f) => {
+        const name = file + rank;
+        const sq = document.createElement("div");
+        const tone = (r + f) % 2 === 0 ? "light" : "dark";
+        sq.className = "sq " + tone;
+        sq.id = `${this.uid}-${name}`;
+        sq.dataset.square = name;
+        sq.setAttribute("role", "gridcell");
 
-      if (last && (name === last.slice(0, 2) || name === last.slice(2, 4))) {
-        sq.classList.add("lastmove");
-      }
-      if (name === this.selected) sq.classList.add("selected");
-      if (this.state.blast && this.state.blast.includes(name)) sq.classList.add("blast");
-      if (this.marks[name]) sq.classList.add("mark-" + this.marks[name]);
+        if (last && (name === last.slice(0, 2) || name === last.slice(2, 4))) {
+          sq.classList.add("lastmove");
+        }
+        if (name === this.selected) sq.classList.add("selected");
+        if (name === this.cursor) sq.classList.add("cursor");
+        if (name === inCheck) sq.classList.add("in-check");
+        if (this.state.blast && this.state.blast.includes(name)) sq.classList.add("blast");
+        if (this.marks[name]) sq.classList.add("mark-" + this.marks[name]);
 
-      const piece = pieces[name];
-      if (piece) {
-        const span = pieceNode(piece);
-        // The square whose piece is currently in the air keeps its slot — the
-        // ghost is what makes "I am holding this one" legible, and removing it
-        // would make the board flicker a hole on every pickup.
-        if (this.drag && this.drag.from === name) span.classList.add("ghost");
-        sq.append(span);
-      }
-      if (targetSquares.has(name)) {
-        const hint = document.createElement("div");
-        hint.className = "hint" + (piece ? " capture" : "");
-        sq.append(hint);
-      }
-      if (this.playable && this.state.legal[name]) sq.classList.add("grabbable");
+        const piece = pieces[name];
+        if (piece) {
+          const span = pieceNode(piece);
+          // The square whose piece is currently in the air keeps its slot — the
+          // ghost is what makes "I am holding this one" legible, and removing it
+          // would make the board flicker a hole on every pickup.
+          if (this.drag && this.drag.from === name) span.classList.add("ghost");
+          sq.append(span);
+        }
+        sq.setAttribute("aria-label", squareLabel(name, piece));
+        if (name === this.selected) sq.setAttribute("aria-selected", "true");
 
-      if (f === 0) sq.append(this._coord("rank", rank));
-      if (r === 7) sq.append(this._coord("file", file));
-      this.grid.append(sq);
-    }));
+        if (targetSquares.has(name)) {
+          const hint = document.createElement("div");
+          hint.className = "hint" + (piece ? " capture" : "");
+          sq.append(hint);
+        }
+        if (this.playable && this.state.legal[name]) sq.classList.add("grabbable");
+
+        if (f === 0) sq.append(this._coord("rank", rank, tone));
+        if (r === 7) sq.append(this._coord("file", file, tone));
+        row.append(sq);
+      });
+      this.grid.append(row);
+    });
     this._renderArrows();
   }
 
-  _coord(kind, text) {
+  _coord(kind, text, tone) {
     const div = document.createElement("div");
-    div.className = "coord " + kind;
+    div.className = "coord " + kind + " on-" + tone;
     div.textContent = text;
     return div;
+  }
+
+  /** Keyboard grammar: move a cursor, Enter selects, Enter again plays. */
+  _key(event) {
+    if (!this.state) return;
+    const step = { ArrowLeft: [-1, 0], ArrowRight: [1, 0],
+                   ArrowUp: [0, 1], ArrowDown: [0, -1] }[event.key];
+    if (step) {
+      event.preventDefault();
+      const [df, dr] = step;
+      if (!this.cursor) {
+        this.cursor = this.flipped ? "e7" : "e2";
+      } else {
+        const file = FILES.indexOf(this.cursor[0]) + (this.flipped ? -df : df);
+        const rank = +this.cursor[1] + (this.flipped ? -dr : dr);
+        if (file >= 0 && file < 8 && rank >= 1 && rank <= 8) {
+          this.cursor = FILES[file] + rank;
+        }
+      }
+      this.render();
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      this.selected = null;
+      this.render();
+      return;
+    }
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (!this.cursor) {
+      this.cursor = this.flipped ? "e7" : "e2";
+      this.render();
+      return;
+    }
+    const matches = this._movesTo(this.cursor);
+    if (matches.length) { this._play(matches); return; }
+    this.selected = this.playable && this.state.legal[this.cursor]
+      ? this.cursor
+      : null;
+    this.render();
   }
 
   /** Board coordinates of a square's centre, in the 0..8 arrow viewBox. */

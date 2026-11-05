@@ -3,8 +3,9 @@
 No token needed: a user's finished public games are exported anonymously, and
 `perfType=atomic` filters to the variant server-side. An OAuth token only buys
 a higher rate limit (60 games/s for your own history against 20 anonymous) and
-access to ongoing or private games, so it stays optional — `ATOMIC_LICHESS_TOKEN`
-is used if set and ignored if not.
+access to ongoing or private games, so it stays optional. The token is read
+from `ATOMIC_LICHESS_TOKEN` if set, or from `data/lichess_token` (one line,
+git-ignored) if that file exists. Both are ignored when absent.
 
 Imports are incremental. The store remembers the newest `createdAt` seen for an
 account and passes it as `since`, so the second run of the day downloads the
@@ -28,10 +29,16 @@ import urllib.request
 from collections.abc import Callable, Iterator
 from typing import Any
 
+from lab import config
+
 from .. import store
 
 API = "https://lichess.org/api/games/user/{user}"
 USER_AGENT = "atomic-trainer/0.1 (research; contact: cleehikai@gmail.com)"
+
+#: Optional OAuth token. Put it in this file rather than in a shell history or a
+#: chat message; `atomic/.gitignore` keeps the file out of the repository.
+TOKEN_FILE = config.DATA / "lichess_token"
 
 #: Statuses where nobody actually moved. Kept out of the store: they are not
 #: games, and an "analysed" 0-ply game is just noise in every later query.
@@ -42,11 +49,23 @@ class LichessError(RuntimeError):
     pass
 
 
+def token() -> str | None:
+    """The optional Lichess OAuth token, from the environment or the file."""
+    value = os.environ.get("ATOMIC_LICHESS_TOKEN", "").strip()
+    if value:
+        return value
+    try:
+        value = TOKEN_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return value or None
+
+
 def _request(url: str) -> urllib.request.Request:
     headers = {"User-Agent": USER_AGENT, "Accept": "application/x-ndjson"}
-    token = os.environ.get("ATOMIC_LICHESS_TOKEN")
-    if token:
-        headers["Authorization"] = f"Bearer {token}"
+    value = token()
+    if value:
+        headers["Authorization"] = f"Bearer {value}"
     return urllib.request.Request(url, headers=headers)
 
 

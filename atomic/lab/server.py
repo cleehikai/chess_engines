@@ -16,6 +16,7 @@ Fairy-Stockfish, rather than reimplemented in JavaScript where it would drift.
 from __future__ import annotations
 
 import json
+import mimetypes
 import threading
 import webbrowser
 from functools import lru_cache
@@ -109,12 +110,14 @@ def _levels() -> list[dict]:
 def _state(board: chess.variant.AtomicBoard, last: chess.Move | None = None) -> dict:
     """Everything the page needs to render a position."""
     blast = []
+    san = None
     if last is not None:
         # `board` already has `last` played, so the explosion has to be
         # recomputed from the position before it.
         before = board.copy()
         before.pop()
         blast = [chess.square_name(sq) for sq in explosion_squares(before, last)]
+        san = before.san(last)
 
     legal: dict[str, list[str]] = {}
     for move in board.legal_moves:
@@ -128,6 +131,7 @@ def _state(board: chess.variant.AtomicBoard, last: chess.Move | None = None) -> 
         "over": board.is_game_over(claim_draw=True),
         "result": game_result(board),
         "last": last.uci() if last else None,
+        "san": san,
         "blast": blast,
         "ply": len(board.move_stack),
     }
@@ -172,12 +176,28 @@ class Handler(BaseHTTPRequestHandler):
         length = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(length) or b"{}")
 
+    def _static(self, name: str) -> None:
+        """Serve one file out of `ui/`, and nothing outside it."""
+        path = (UI_DIR / name).resolve()
+        if not path.is_file() or UI_DIR.resolve() not in path.parents:
+            self._json({"error": "not found"}, 404)
+            return
+        kind, _ = mimetypes.guess_type(path.name)
+        self._send(200, path.read_bytes(), kind or "application/octet-stream")
+
     # -- routes ------------------------------------------------------------
 
     def do_GET(self) -> None:  # noqa: N802
-        if self.path in ("/", "/index.html"):
+        route = self.path.split("?", 1)[0]
+        if route in ("/", "/index.html"):
             self._send(200, (UI_DIR / "index.html").read_bytes(), "text/html; charset=utf-8")
-        elif self.path == "/api/info":
+        elif route.startswith("/api/"):
+            self._api_get(route)
+        else:
+            self._static(route.lstrip("/"))
+
+    def _api_get(self, route: str) -> None:
+        if route == "/api/info":
             self._json(
                 {
                     "engine": self.engine.name,

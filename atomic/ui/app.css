@@ -1,6 +1,10 @@
-/* Shared styling for the trainer. One dark theme, no framework, no build step.
-   The board rules are lifted from ui/index.html so the two pages look like the
-   same program; everything below the board section is new. */
+/* Shared styling for both atomic pages: the play page (`index.html`) and the
+   trainer. One dark theme, no framework, no build step.
+
+   The board follows Lichess's own visual language - the same cburnett pieces,
+   the brown #f0d9b5/#b58863 squares, and chessground's green last-move and
+   selection colours - without vendoring the AGPL front end or adding a build
+   step. Both pages import the same `board.js`, so there is one board. */
 
 :root {
   --bg: #16181d;
@@ -10,10 +14,14 @@
   --text: #e6e8ec;
   --dim: #8b93a3;
   --faint: #626b7d;
-  --light: #b9a68b;
-  --dark: #6f5b45;
-  --sel: #6b9b4a;
-  --last: #7a7233;
+  /* Lichess's default brown board: light #f0d9b5, dark #b58863. */
+  --light: #f0d9b5;
+  --dark: #b58863;
+  /* Chessground's own highlight colours: last move lime, selection green. */
+  --sel: rgb(20 85 30 / 0.5);
+  --last: rgb(155 199 0 / 0.41);
+  --coord-light: #f0d9b5;
+  --coord-dark: #946f51;
   --blast: #d0422e;
   --accent: #7aa2f7;
   --good: #6cc070;
@@ -104,8 +112,13 @@ button, select, input[type=text] {
 button { cursor: pointer; }
 button:hover:not(:disabled) { background: #2f3542; }
 button:disabled { opacity: .4; cursor: default; }
-button.primary { background: #2d4a7c; border-color: #395c98; }
-button.primary:hover:not(:disabled) { background: #35558d; }
+/* Lichess's green play button; keeps the accent blue for links and focus. */
+button.primary { background: #4a7a2f; border-color: #5c913b; }
+button.primary:hover:not(:disabled) { background: #568a37; }
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
 button.ghost { background: transparent; }
 button.wide { width: 100%; }
 .row { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -172,6 +185,8 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 }
 .board-sm .board { --sq: min(7vw, 44px); }
 .board-lg .board { --sq: min(11vw, 78px); }
+/* Rows exist for the accessibility tree; layout still uses the 8x8 grid. */
+.row-cells { display: contents; }
 
 .arrows {
   position: absolute; inset: 0; pointer-events: none; z-index: 5;
@@ -268,17 +283,26 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .sq.dark  { background: var(--dark); }
 .sq.grabbable { cursor: grab; }
 .sq.grabbable:active { cursor: grabbing; }
-.sq.selected::after, .sq.lastmove::after,
+.sq.selected::after, .sq.lastmove::after, .sq.in-check::after,
 .sq.mark-right::after, .sq.mark-wrong::after, .sq.mark-hint::after {
   content: ""; position: absolute; inset: 0; pointer-events: none;
 }
-.sq.lastmove::after { background: var(--last); opacity: .45; }
-.sq.selected::after { background: var(--sel); opacity: .55; }
+.sq.lastmove::after { background: var(--last); }
+.sq.selected::after { background: var(--sel); }
 .sq.mark-right::after { background: var(--good); opacity: .5; }
 .sq.mark-wrong::after { background: var(--bad); opacity: .5; }
 .sq.mark-hint::after {
   box-shadow: inset 0 0 0 calc(var(--sq) * .07) var(--warn); opacity: .9;
 }
+/* Chessground draws check as a red ellipse behind the king. */
+.sq.in-check::after {
+  background: radial-gradient(ellipse at center,
+    rgb(255 0 0 / 1) 0%, rgb(231 0 0 / 1) 25%,
+    rgb(169 0 0 / 0) 89%, rgb(158 0 0 / 0) 100%);
+}
+/* The keyboard cursor. Separate from selection so a keyboard user can see
+   where they are before committing to a piece. */
+.sq.cursor { outline: 3px solid rgb(74 144 255 / .9); outline-offset: -3px; }
 /* -- pieces ---------------------------------------------------------------
    cburnett, the Lichess default set (ui/pieces/README.md). Drawn as a
    background image rather than an <img> so a piece is one empty element that
@@ -334,26 +358,59 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .piece.p-bN { background-image: url("pieces/bN.svg"); }
 .piece.p-bP { background-image: url("pieces/bP.svg"); }
 
+/* Chessground's move hints: a dot on an empty square, a ring around a piece. */
 .hint {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  z-index: 3; pointer-events: none;
-  width: 30%; height: 30%; border-radius: 50%; background: rgba(0,0,0,.32);
+  position: absolute; inset: 0; z-index: 3; pointer-events: none;
+  background: radial-gradient(rgb(20 85 30 / .5) 19%, transparent 20%);
 }
 .hint.capture {
-  width: 92%; height: 92%; border-radius: 50%;
-  background: none; border: calc(var(--sq) * 0.08) solid rgba(0,0,0,.32);
+  background: radial-gradient(transparent 0%, transparent 79%,
+    rgb(20 85 0 / .3) 80%);
 }
 .sq.blast { animation: boom .7s ease-out; }
 @keyframes boom {
   0%   { box-shadow: inset 0 0 0 0 var(--blast); background: var(--blast); }
   100% { box-shadow: inset 0 0 0 0 transparent; }
 }
+/* Inner coordinates, like Lichess: legible on both square colours. */
 .coord {
-  position: absolute; font-size: 10px; font-weight: 600;
-  opacity: .55; z-index: 4; pointer-events: none;
+  position: absolute; font-size: 10px; font-weight: 700;
+  opacity: .85; z-index: 4; pointer-events: none;
 }
 .coord.file { right: 3px; bottom: 1px; }
 .coord.rank { left: 3px; top: 1px; }
+.coord.on-light { color: var(--coord-dark); text-shadow: none; }
+.coord.on-dark { color: var(--coord-light); text-shadow: 0 1px 2px #000; }
+
+/* -- a round: the board with a player above and below it ------------------ */
+
+.round {
+  display: flex; flex-direction: column; gap: 6px;
+  width: max-content; max-width: 100%;
+}
+.player {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 6px 10px; font-size: 13px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 4px;
+}
+.player .who {
+  display: flex; align-items: center; gap: 8px; min-width: 0; overflow: hidden;
+}
+.player .name {
+  font-weight: 600; white-space: nowrap; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis;
+}
+.player .meta {
+  color: var(--dim); font-size: 12px; text-align: right;
+  min-width: 0; flex: 1 1 auto;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.player .dot {
+  width: 10px; height: 10px; border-radius: 50%; flex: 0 0 auto;
+  background: #e8e6e1; border: 1px solid var(--line);
+}
+.player .dot.black { background: #1c1e24; border-color: #55596a; }
 
 .promo-backdrop {
   position: fixed; inset: 0; background: #000a; z-index: 60;
@@ -590,4 +647,14 @@ table.rep-lines tr.rename-row td { padding: 0; }
 
 @media (max-width: 900px) {
   .split > .side { flex: 1 1 100%; width: 100%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  /* Keep the information the blast animation carried, without the motion. */
+  .sq.blast { box-shadow: inset 0 0 0 3px var(--blast); }
 }
