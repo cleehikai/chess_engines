@@ -138,7 +138,7 @@ the net's Elo from the scores, prints a confidence interval, and appends a row
 
 ```powershell
 # Rate a net: 24 games at each of 4 Stockfish levels, 0.2s/move
-python -m tools.rate --nnue data/nnue.pt --version v1 --games 24 --movetime 0.2
+python -m tools.rate --nnue data/nnue_v2.pt --version v2 --games 24 --movetime 0.3
 
 # Wider ladder / longer thinking time for a tighter number
 python -m tools.rate --nnue data/nnue_v2.pt --version v2 `
@@ -242,6 +242,97 @@ label. The current net is *sound* but not yet beating the hand-crafted eval.
 For even more strength beyond that, the next engineering step is **incremental
 NNUE accumulators** (update the eval as pieces move instead of recomputing) to
 let the NNUE search deeper — noted below under "optional".
+
+---
+
+## Strength push — 2026-07-06 (in progress)
+
+A fresh, measurement-driven pass. Re-benchmarking invalidated the old mental
+model ("NNUE eval too slow → searches shallower"): FastNNUE eval is now **8.4µs**
+(measured), 23× *faster* than the **191µs** hand eval — yet NNUE search ran 3×
+*slower*. The profiler explained why.
+
+**Step 1 — eval-tax wiring bug (done, verified).** `board.py` called the full
+hand `evaluate()` on *every* NNUE node just to get style `EvalFeatures` — 66% of
+the NNUE search's time by profile — even for `balanced`, which does **zero**
+shaping and discards them. Fix: on the no-shaping path hand the searcher the raw
+`nnue.eval_cp` (no features); when shaping is active, use the new
+`evaluate.cheap_features()` (bitboard-only, no PST loop, feature-parity verified
+vs full `evaluate`). Result: NNUE nps ~4,500 → ~8,000–10,000, +1 ply. Match
+**NNUE v3 vs hand @0.3s went 0-8 → 0-5-3** (losses became draws). Isolates the
+remaining gap to eval quality, not speed — exactly as predicted.
+
+**Step 2 — modern search (done, verified, with a caveat).** Implemented
+null-move pruning (zugzwang-guarded), LMR, PVS, aspiration windows, check
+extensions, delta pruning — all as individual `Searcher` flags. **Honest
+result:** at fixed depth 5 they cut nodes ~2.7× with identical moves, but a
+fixed-*time* ablation (12 games each vs a plain baseline, hand eval @0.25s)
+showed most don't pay off at the depth this pure-Python engine actually reaches
+(~2-4 ply in blitz):
+
+| feature | vs plain | shipped |
+|---|---|---|
+| aspiration | **6-0-6** | **ON** (verified identical result to full-window — pure speed) |
+| check ext | 3-4-5 | off |
+| null-move | 6-6-0 | off (toggle) |
+| LMR | 6-6-0 | off (toggle) |
+| PVS | 6-6-0 | off (toggle) |
+
+So the default is **aspiration + the bugfix**; the depth-hungry techniques are
+correct and one flag away for when nps rises. Also fixed a **pre-existing latent
+bug**: a `_TimeUp` mid-node left pushes (incl. null moves) on the caller's board,
+which could surface an *illegal* move — `search()` now unwinds to base stack
+depth on timeout. Lesson recorded: verify search with fixed-TIME matches, never
+fixed-depth node counts.
+
+**Step 3 — training recipe (done).** `StepLR(gamma=0.5, step=10)` decayed the LR
+so fast that v2/v3 saved their "best" net at epoch ~21–24 of 60 and never improved
+— the schedule starved the optimizer, not convergence. Replaced with cosine
+annealing over the full budget + linear warmup. Added **quantization-aware
+training** (`--qat`): fake-quantizes activations to the inference int grid
+(straight-through estimator) so the deployed int net matches what was trained.
+**QAT verified working:** v4's float-vs-int eval gap dropped to mean 1.0cp/max 2cp
+(v3 was 1.6/4) — quantization error ~halved. Also added `--weight-decay` and
+`--patience`.
+
+**What retraining v4 revealed:** with the LR fixed, v4 trained productively to its
+best at epoch 42 (v2/v3 had stalled at ~22) — but then **overfit** (train
+0.0066 ≪ val 0.0293). The recipe fixes worked, and they exposed the *next* wall:
+**the 1.86M-position dataset is now the limit, not the training recipe.** The
+highest-leverage lever is now more/better DATA (Step 4 + the 5070), not more
+training tricks.
+
+**Strength result: v4 LOST to v3, 3-6-1** (@0.3s). The QAT quantization win
+(−0.6cp) couldn't offset the generalization lost to overfitting — a clean,
+honest negative. **v3 stays the strongest net.** A regularized **v5** (same
+recipe + `--weight-decay 5e-4 --patience 8`) is the corrective; but the verdict
+is already clear at the data level: a 10.5M-param net overfits 1.86M positions,
+so the ceiling is **data quantity/quality**, full stop. The recipe fixes are
+correct and will *compound* once there's GPU-scale data on the 5070 — they're
+prerequisites, not the bottleneck.
+
+**Step 4 — data quality (done, code).** `gen_data.py`: label depth default 9→12
+(stronger teacher), **dedup by zobrist** (low-randomness self-play produced many
+near-duplicates that padded the count without signal), and a **quiet-position
+filter** (skip positions whose SF best move is a capture/promotion — tactical
+targets teach exchange arithmetic, not eval). Reuses SF's analysis for both label
+and game move (one search/ply, not two). Fixed a Windows-path bug in the results
+summary (`shard:count` split broke on the drive-letter colon).
+
+### Bottom line of this push
+
+- **Shipped net stays v3.** Neither v4 (overfit) nor the retrains beat it; the
+  eval is data-limited, not recipe-limited.
+- **Shipped search = aspiration windows + the illegal-move timeout bugfix.** The
+  rest (null-move/LMR/PVS/check-ext) are implemented, correct, and toggle-off —
+  they'll turn positive once nps rises.
+- **The one lever that matters next: DATA.** Regenerate at `--depth 12+` with the
+  new dedup/quiet-filter, scale hard on the 5070 (`--games 20000`), then the
+  cosine+QAT recipe (now fixed) will actually convert it to strength. Consider a
+  smaller net (HL 128) or more weight-decay until the data catches up.
+- **Method lesson:** verify search with fixed-TIME matches (fixed-depth node
+  counts lie about wall-clock engines), and never trust float val-loss across a
+  QAT boundary — only the quantized head-to-head match.
 
 ---
 

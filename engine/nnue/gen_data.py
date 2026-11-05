@@ -28,28 +28,42 @@ import time
 
 import chess
 import chess.engine
+import chess.polyglot
+
+from tools.estimate import announce
 
 SF_PATH = os.path.abspath(os.path.join("tools", "stockfish.exe"))
 EVAL_CLAMP = 2000  # centipawns; mates/huge evals clamped to keep targets sane
 
 
 def _sf_eval_cp(engine: chess.engine.SimpleEngine, board: chess.Board,
-                depth: int) -> int:
-    """White-relative centipawn eval, clamped. Mate scores mapped to +/-CLAMP."""
+                depth: int) -> tuple[int, chess.Move | None]:
+    """White-relative centipawn eval (clamped) AND Stockfish's best move.
+
+    The best move lets the caller filter out *tactical* positions (where the top
+    move is a capture): those targets are dominated by the swing of an immediate
+    exchange and teach the net exchange arithmetic rather than positional
+    understanding. Labeling only quiet positions is the standard NNUE recipe and
+    improves label quality more per position than raising depth alone.
+    """
     info = engine.analyse(board, chess.engine.Limit(depth=depth))
     score = info["score"].white()
     cp = score.score(mate_score=EVAL_CLAMP)
-    return max(-EVAL_CLAMP, min(EVAL_CLAMP, cp))
+    cp = max(-EVAL_CLAMP, min(EVAL_CLAMP, cp))
+    pv = info.get("pv")
+    best = pv[0] if pv else None
+    return cp, best
 
 
 def _play_one_game(engine: chess.engine.SimpleEngine, depth: int,
-                   rng: random.Random, max_plies: int = 200):
-    """Play a lightly-randomized game; yield (board_copy, eval_cp) for each
-    quiet-ish position. Returns the final result string."""
+                   rng: random.Random, seen: set[int], max_plies: int = 200):
+    """Play a lightly-randomized game; yield (fen, eval_cp) for each quiet
+    position. `seen` is a shared set of zobrist hashes for dedup across the
+    worker's games. Returns (samples, result)."""
     board = chess.Board()
     samples: list[tuple[str, int]] = []
     # A few random plies ONLY for opening diversity (kept small so early
-    # positions stay realistic). Every non-check position is labeled -- including
+    # positions stay realistic). Every quiet position is labeled -- including
     # the opening -- so the net learns development and tempo, not just midgames.
     opening_random = rng.randint(1, 4)
 
@@ -57,21 +71,29 @@ def _play_one_game(engine: chess.engine.SimpleEngine, depth: int,
         if board.is_game_over():
             break
 
-        # Label the current position (skip in-check positions -> noisy targets).
-        if not board.is_check():
-            cp = _sf_eval_cp(engine, board, depth)
-            samples.append((board.fen(), cp))
+        # Reuse Stockfish's analysis for both the label AND the game move, so we
+        # don't pay for two searches per ply.
+        cp, best = _sf_eval_cp(engine, board, depth)
+
+        # Quiet-position filter: label only positions that are not in check and
+        # whose best move is not a capture/promotion. Dedup by zobrist hash so
+        # near-duplicate positions (common in low-randomness self-play) don't
+        # dominate the dataset and inflate the count without adding signal.
+        quiet = (not board.is_check() and best is not None
+                 and not board.is_capture(best) and not best.promotion)
+        if quiet:
+            key = chess.polyglot.zobrist_hash(board)
+            if key not in seen:
+                seen.add(key)
+                samples.append((board.fen(), cp))
 
         if ply < opening_random:
             move = rng.choice(list(board.legal_moves))
+        elif rng.random() < 0.05:
+            # Occasionally inject a random move mid-game for state diversity.
+            move = rng.choice(list(board.legal_moves))
         else:
-            # Occasionally inject a random move mid-game for state diversity, but
-            # mostly follow Stockfish so games and evals stay realistic.
-            if rng.random() < 0.05:
-                move = rng.choice(list(board.legal_moves))
-            else:
-                result = engine.play(board, chess.engine.Limit(depth=depth))
-                move = result.move or rng.choice(list(board.legal_moves))
+            move = best or rng.choice(list(board.legal_moves))
         board.push(move)
 
     outcome = board.outcome()
@@ -91,10 +113,11 @@ def _worker(args) -> str:
     engine = chess.engine.SimpleEngine.popen_uci(SF_PATH)
     engine.configure({"Threads": 1, "Hash": 64})
     written = 0
+    seen: set[int] = set()  # zobrist hashes for cross-game dedup in this worker
     try:
         with open(shard, "w", encoding="utf-8") as f:
             for g in range(n_games):
-                samples, result = _play_one_game(engine, depth, rng)
+                samples, result = _play_one_game(engine, depth, rng, seen)
                 for fen, cp in samples:
                     f.write(f"{fen}\t{cp}\t{result}\n")
                     written += 1
@@ -104,7 +127,10 @@ def _worker(args) -> str:
                           f"({written} samples)", flush=True)
     finally:
         engine.quit()
-    return f"{shard}:{written}"
+    # Return count separately from the path -- Windows paths contain ':' (drive
+    # letter), so packing them into one "path:count" string and splitting on ':'
+    # mis-parses. Return a tuple instead.
+    return (shard, written)
 
 
 def main() -> None:
@@ -112,7 +138,9 @@ def main() -> None:
     ap.add_argument("--games", type=int, default=200, help="total games")
     ap.add_argument("--workers", type=int,
                     default=max(1, (os.cpu_count() or 2) - 2))
-    ap.add_argument("--depth", type=int, default=9, help="Stockfish label depth")
+    ap.add_argument("--depth", type=int, default=12,
+                    help="Stockfish label depth (higher = stronger teacher = "
+                         "stronger net; 12-16 recommended, was 9)")
     ap.add_argument("--out", default=os.path.join("data", "train"),
                     help="output path prefix")
     ap.add_argument("--seed", type=int, default=1234)
@@ -127,19 +155,62 @@ def main() -> None:
         (wid, per_worker, args.depth, args.seed + wid * 7919, args.out)
         for wid in range(args.workers)
     ]
-    print(f"Generating ~{per_worker*args.workers} games across "
+    n_games = per_worker * args.workers
+    print(f"Generating ~{n_games} games across "
           f"{args.workers} workers, Stockfish depth {args.depth}...")
+
+    # Calibration (measured on this machine, 6 physical / 12 logical cores).
+    # The estimate models AGGREGATE throughput (games/hr for the whole pool),
+    # NOT per-worker cost -- because those move in opposite directions and only
+    # the aggregate matters for wall-clock. Each worker slows down as you add
+    # more (hyperthreading contention past 6 physical cores), but total
+    # throughput still RISES monotonically with worker count. Measured games/hr
+    # at depth 10 (48-game head-to-head batches):
+    #     4w=5850  6w=5904  8w=6609  12w=7432   -> more workers = faster overall.
+    # (An earlier version modeled per-worker contention and produced a
+    #  non-monotonic ETA where 6w looked slower than 4w -- an interpolation
+    #  artifact, since real throughput is monotonic. Fixed here.)
+    #
+    # Depth: aggregate cost grows geometrically, ~1.65 per ply (measured solo
+    # s/game d9=1.12, d10=1.87, d12=5.04 -> (5.04/1.12)**(1/3) ~= 1.65).
+    #
+    # Reproduces the real 40k-game / d10 / 10-worker run (~4.8 hr) to +~18%,
+    # erring LONG so the ETA never under-promises.
+    DEPTH_BRANCHING = 1.65
+    # (workers, measured games/hr) at depth 10. Interpolated/extrapolated below.
+    _GAMES_PER_HR_D10 = [(4, 5850), (6, 5904), (8, 6609), (12, 7432)]
+
+    def _games_per_hr_d10(w: int) -> float:
+        pts = _GAMES_PER_HR_D10
+        if w <= pts[0][0]:
+            return pts[0][1]
+        if w >= pts[-1][0]:
+            return pts[-1][1]  # clamp: no gain modeled past max measured
+        for (x0, y0), (x1, y1) in zip(pts, pts[1:]):
+            if x0 <= w <= x1:
+                return y0 + (y1 - y0) * (w - x0) / (x1 - x0)
+        return pts[-1][1]
+
+    # Aggregate seconds per game at depth 10 for this worker count, then scale
+    # by the geometric depth factor (relative to the d10 measurement point).
+    agg_s_per_game_d10 = 3600.0 / _games_per_hr_d10(args.workers)
+    depth_factor = DEPTH_BRANCHING ** (args.depth - 10)
+    est_s = n_games * agg_s_per_game_d10 * depth_factor
+    announce(
+        f"Data-gen (~{n_games} games, depth {args.depth})", est_s,
+        f"~{_games_per_hr_d10(args.workers):.0f} games/hr @ d10 x {args.workers}w"
+        f" x {DEPTH_BRANCHING}^(d-10)={depth_factor:.2f} depth factor")
 
     t0 = time.perf_counter()
     with mp.Pool(args.workers) as pool:
         results = pool.map(_worker, tasks)
     dt = time.perf_counter() - t0
 
-    total = sum(int(r.split(":")[1]) for r in results)
+    total = sum(count for _shard, count in results)
     print(f"Done: {total} samples in {dt:.0f}s "
           f"({total/max(dt,1):.0f} samples/s). Shards:")
-    for r in results:
-        print("  ", r)
+    for shard, count in results:
+        print(f"   {shard}: {count}")
 
 
 if __name__ == "__main__":

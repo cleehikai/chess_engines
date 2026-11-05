@@ -10,6 +10,7 @@ Python lists; a custom collate packs them into EmbeddingBag (idx, offset) form.
 from __future__ import annotations
 
 import glob
+import hashlib
 import math
 
 import chess
@@ -17,6 +18,17 @@ import torch
 from torch.utils.data import Dataset
 
 from engine.nnue.features import both_perspectives
+
+
+def fen_key(fen: str) -> int:
+    """Stable 64-bit hash of a FEN, identical across processes and runs.
+
+    Python's builtin hash() is salted per-process (PYTHONHASHSEED), so a split
+    derived from it would silently change between runs and stop being a real
+    held-out set. blake2b is cheap and deterministic.
+    """
+    d = hashlib.blake2b(fen.encode("utf-8"), digest_size=8).digest()
+    return int.from_bytes(d, "big")
 
 # A win (+1) corresponds to this many centipawns when mixing result into target.
 RESULT_SCALE = 600.0
@@ -43,6 +55,12 @@ class NNUEDataset(Dataset):
         self.style_profile = style_profile
         # samples: (stm_idx, nstm_idx, target, weight)
         self.samples: list[tuple[list[int], list[int], float, float]] = []
+        # Parallel to `samples`: a stable hash of each sample's FEN. Duplicate
+        # FENs (~3.6% of lines, since gen_data dedups per-worker not globally)
+        # share a key, which lets the trainer put every copy of a position on the
+        # same side of the train/val split. Splitting by *line* instead leaks:
+        # a held-out position is likely also sitting in train under another line.
+        self.fen_keys: list[int] = []
         weigh = None
         if style_profile is not None:
             from engine.nnue.style_weight import position_style_weight
@@ -68,6 +86,7 @@ class NNUEDataset(Dataset):
                     target = self._make_target(cp, result)
                     weight = weigh(board, style_profile) if weigh else 1.0
                     self.samples.append((stm, nstm, target, weight))
+                    self.fen_keys.append(fen_key(fen))
                     if max_samples and len(self.samples) >= max_samples:
                         return
 

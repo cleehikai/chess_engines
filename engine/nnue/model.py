@@ -20,12 +20,28 @@ import torch.nn as nn
 from engine.nnue.features import NUM_FEATURES
 
 HL = 256  # feature-transformer hidden size per perspective
+_QA = 255  # activation quantization scale; must match kernels.QA
+
+
+def _fake_quant(x: torch.Tensor, scale: int) -> torch.Tensor:
+    """Round `x` (already in [0,1]) to the int grid used at inference, then map
+    back to float -- with a straight-through gradient so training can still flow.
+
+    At inference these activations become round(x * scale) ints (see
+    kernels.quantize_acc / dense_forward). Simulating that rounding in the
+    forward pass ("fake quantization") makes the net learn weights that survive
+    quantization, closing the float-vs-int eval gap. Straight-through estimator:
+    forward rounds, backward is the identity.
+    """
+    q = torch.round(x * scale) / scale
+    return x + (q - x).detach()
 
 
 class NNUE(nn.Module):
     def __init__(self, num_features: int = NUM_FEATURES, hl: int = HL):
         super().__init__()
         self.hl = hl
+        self.qat = False  # set True by the trainer for quantization-aware training
         # Feature transformer as an embedding table: summing the rows of the
         # active features == a sparse matrix-vector product. +1 bias row.
         self.ft = nn.EmbeddingBag(num_features, hl, mode="sum")
@@ -55,8 +71,15 @@ class NNUE(nn.Module):
 
         x = torch.cat([acc_stm, acc_nstm], dim=1)
         x = torch.clamp(x, 0.0, 1.0)          # clipped ReLU, NNUE-style
+        if self.qat:
+            # Match kernels.quantize_acc: activations become round(x*QA) ints.
+            x = _fake_quant(x, _QA)
         x = torch.clamp(self.l1(x), 0.0, 1.0)
+        if self.qat:
+            x = _fake_quant(x, _QA)
         x = torch.clamp(self.l2(x), 0.0, 1.0)
+        if self.qat:
+            x = _fake_quant(x, _QA)
         return self.out(x)
 
     @torch.no_grad()

@@ -39,6 +39,7 @@ import chess.engine
 
 from engine.board import Engine
 from engine.nnue import meta
+from tools.estimate import announce
 
 SF_PATH = os.path.join(os.path.dirname(__file__), "stockfish.exe")
 SF_LOW, SF_HIGH = 1320, 3190  # Stockfish UCI_Elo bounds (SF18)
@@ -190,6 +191,14 @@ def main() -> None:
     print(f"Rating {args.nnue} (style={args.style}) at {args.movetime*1000:.0f}"
           f"ms/move vs Stockfish levels {levels}\n", flush=True)
 
+    # games are played at EACH level; ~80 plies/game, one side thinks per ply.
+    total_games = args.games * len(levels)
+    est_s = total_games * 80 * args.movetime
+    announce(
+        f"Rating ({total_games} games: {args.games} x {len(levels)} levels)",
+        est_s,
+        f"{total_games} games x ~80 plies x {args.movetime*1000:.0f}ms/move")
+
     t0 = time.perf_counter()
     r = rate(args.nnue, args.style, levels, args.games, args.movetime)
     dt = time.perf_counter() - t0
@@ -202,6 +211,9 @@ def main() -> None:
         print(f"  trained on {md.get('positions','?')} positions, "
               f"label depth {md.get('label_depth','?')}, "
               f"lambda {md.get('lambda','?')}, epochs {md.get('epochs','?')}")
+    else:
+        print(f"  (no metadata sidecar: {meta.meta_path(args.nnue)} — "
+              f"positions/lambda/epochs unknown)")
     print(f"  per level: " +
           "  ".join(f"SF{l}:{s*100:.0f}%" for l, s in r["per_level"]))
     print(f"  ({dt/60:.1f} min)")

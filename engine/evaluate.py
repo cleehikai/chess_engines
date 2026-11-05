@@ -240,6 +240,50 @@ def evaluate(board: chess.Board) -> tuple[int, EvalFeatures]:
     return score_stm, feats
 
 
+def cheap_features(board: chess.Board) -> EvalFeatures:
+    """Compute just the positional features the style layer consumes, WITHOUT
+    the expensive scalar score (no PST loop over piece_map).
+
+    Used by the NNUE path: the net supplies the score, so the only reason to
+    touch the hand eval is the style features. Recomputing the full `evaluate`
+    per node (its PST loop + attack spans dominate the NNUE search hot path)
+    was pure waste; this extracts the ~6 fields shaping actually reads straight
+    from bitboards. Returns White-relative values, matching `EvalFeatures`.
+    """
+    if board.king(chess.WHITE) is None or board.king(chess.BLACK) is None:
+        return _empty_features()
+
+    mat_w = mat_b = 0
+    non_pawn = 0
+    for piece_type in (chess.PAWN, chess.KNIGHT, chess.BISHOP,
+                       chess.ROOK, chess.QUEEN):
+        w = chess.popcount(int(board.pieces_mask(piece_type, chess.WHITE)))
+        b = chess.popcount(int(board.pieces_mask(piece_type, chess.BLACK)))
+        val = PIECE_VALUE[piece_type]
+        mat_w += w * val
+        mat_b += b * val
+        if piece_type != chess.PAWN:
+            non_pawn += (w + b) * val
+    phase = min(1.0, non_pawn / _PHASE_MAX) if _PHASE_MAX else 0.0
+
+    ks_w = _king_shelter(board, chess.WHITE)
+    ks_b = _king_shelter(board, chess.BLACK)
+    mob_w = _attack_span(board, chess.WHITE)
+    mob_b = _attack_span(board, chess.BLACK)
+    openness = _count_open_files(board) / 8.0
+
+    return EvalFeatures(
+        material_white=mat_w,
+        material_black=mat_b,
+        phase=phase,
+        openness=openness,
+        king_safety_white=ks_w,
+        king_safety_black=ks_b,
+        mobility_white=mob_w,
+        mobility_black=mob_b,
+    )
+
+
 def _attack_span(board: chess.Board, color: chess.Color) -> int:
     """Total squares attacked by `color`'s knights/bishops/rooks/queens (a cheap
     mobility proxy that needs no move generation). Pawns and king excluded to
