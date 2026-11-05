@@ -591,3 +591,41 @@ table.rep-lines tr.rename-row td { padding: 0; }
 @media (max-width: 900px) {
   .split > .side { flex: 1 1 100%; width: 100%; }
 }
+
+/* -- explain ("Why?") ----------------------------------------------------- */
+
+.explain { display: flex; flex-direction: column; gap: 12px; }
+.explain .thinking { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .45; } }
+.explain-summary { font-size: 15px; font-weight: 600; line-height: 1.4; }
+.explain-moves { margin-top: 6px; }
+.explain-section h3 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--dim); margin: 0 0 6px; font-weight: 600;
+}
+.reason {
+  display: grid; grid-template-columns: 92px 1fr; gap: 4px 10px; align-items: start;
+  padding: 7px 0; border-top: 1px solid var(--line);
+}
+.reason:first-of-type { border-top: 0; }
+.reason-kind {
+  font-size: 10.5px; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--accent); padding-top: 2px;
+}
+.reason.refuted .reason-kind, .reason.self-blast .reason-kind { color: var(--bad); }
+.reason.parries .reason-kind, .reason.wins .reason-kind { color: var(--good); }
+.reason.positional .reason-kind, .reason.close .reason-kind { color: var(--dim); }
+.reason-text { overflow-wrap: anywhere; }
+.reason button { grid-column: 2; justify-self: start; }
+button.small { padding: 3px 9px; font-size: 12px; }
+.explain-themes { margin-top: 6px; }
+.explain-preview {
+  background: var(--panel-2); border: 1px solid var(--line); border-radius: 5px;
+  padding: 8px 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.explain-preview .row { align-items: center; }
+.explain-foot { border-top: 1px solid var(--line); padding-top: 8px; }
+@media (max-width: 520px) {
+  .reason { grid-template-columns: 1fr; }
+  .reason button { grid-column: 1; }
+}

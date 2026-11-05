@@ -369,6 +369,62 @@ checker for accuracy and by solve-rate gain for usefulness.
 4. **Leave Stage D until M3 or M4 produces a transformer.** Then it is mostly
    data plumbing over Stages A–C, and its training data will already exist.
 
+## 6. Stage A: what was built (2026-11-05)
+
+`trainer/explain.py`, exposed three ways:
+
+- **Play tab**: after any move, *Why Nf6?* explains the engine's last move,
+  and *Was h6 OK?* explains yours.
+- **Review tab**: every ply has *Why is h6 bad?* (or *Why Nf3?* when the move
+  was fine).
+- **Terminal**: `py -3.13 -m trainer.cli explain [FEN] --moves Nf3 --move h6`.
+
+Each reason with a line has *Show on board*, which steps through it with ◂ ▸
+(or the arrow keys) and lights the blast squares. Esc returns to the game.
+
+What it computes, from four or five cached searches at 300k nodes each:
+
+| Reason | How it is found |
+|---|---|
+| **refuted** | The move asked about, plus the engine's best reply line. Cut to the shortest prefix where the damage is done: the king explodes, or at least 1.5 pawns of atomic material has changed hands. Every explosion is spelled out: which pieces die on each side, the capturer included. |
+| **parries** | A null move. Hand the opponent the turn, search, and compare. If passing would cost at least 15 win% more than the engine's move does, the move is a defence, and the threat line is shown. That threat line is marked as hypothetical, because the position after a pass never happened. |
+| **threatens** | The same null-move test after the engine's move. A non-mate threat has to land within 5 plies and win material for the side making it, otherwise it is not reported. |
+| **plan** | The engine's own principal variation, when it is forcing. It says so when even the best line loses material. |
+| **check / wins** | Direct rules facts |
+| **kings touch / out of the blast / own pieces / atomic legality** | Rules notes read off the move with `lab.rules`. "Out of the blast" is shown only when there was a real threat. |
+| **positional** | No short forcing line explains the difference. **It says so instead of inventing a tactic.** These cases are the blind-spot set that Stage C exists for. |
+| **close** | Within 5 win%. The engine's preference is noise at this budget. |
+
+Checked so far:
+
+- 17 tests in `tests/test_explain.py`. One runs the real engine.
+- A stress run of ~25 random bad moves from engine self-play positions, read
+  by hand. Every refutation and threat named was a real line the engine
+  played.
+- The Play and Review tabs driven end to end in a headless browser.
+
+All of this used FSF's **handcrafted** atomic eval, because the NNUE file
+could not be downloaded in the build container. On your machine the trainer
+uses the net as usual. The explanations will be stronger, and they will not
+always match the ones above.
+
+Not yet measured: the Stage A blind-spot rate over your own blunders, from
+§4. That needs your analysed games. The way to get it is to run *Why is X
+bad?* over `trainer.cli worst` and count the **positional** answers.
+
+### On rewriting the engine to be readable
+
+An engine that is easier to read but weaker would explain the *wrong* moves:
+you would learn its mistakes. The approach here does not need a readable
+engine. The search-based reason is faithful to whatever engine produced it,
+so the explanation stays tied to Fairy-Stockfish, the strongest atomic
+engine available.
+
+Readability does matter for the **positional** cases, where no short line
+exists. The route there is a small evaluation built from named atomic
+concepts and fitted to agree with FSF (Stage C). It would explain FSF's
+quiet preferences in its own terms without having to play any games itself.
+
 ## Sources
 
 - Queen: arXiv [2610.03695](https://arxiv.org/abs/2610.03695) · code

@@ -34,6 +34,7 @@ measured Elo scale anchored to Fairy-Stockfish + atomic NNUE.
 | Trainer UI (puzzles, review, book, repertoire, play) | Done — `trainer.cli serve` |
 | Puzzle scraper over the rated Lichess dumps | Done — two-tier funnel, deduplicated by position |
 | Analysis board, arrow-key replay, improvement report | Done |
+| "Why?" explanations: refutation, threats via null move, blast facts | Done — `trainer/explain.py`, Play + Review tabs, `cli explain` (`docs/explainability.md` §6) |
 
 ## Measured so far
 

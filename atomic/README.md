@@ -48,6 +48,7 @@ py -3.13 -m trainer.cli import clee96326   # your atomic games from Lichess
 py -3.13 -m trainer.cli analyse       # deep Fairy-Stockfish pass over every ply
 py -3.13 -m trainer.cli review <id>   # where that game was thrown
 py -3.13 -m trainer.cli worst         # your biggest mistakes, across all games
+py -3.13 -m trainer.cli explain --moves Nf3 --move h6   # why a move is bad, from the engine's own lines
 py -3.13 -m trainer.cli book build    # count an opening book from the dumps
 py -3.13 -m trainer.cli book line Nf3 f6   # what the field plays here, and how it scores
 py -3.13 -m trainer.cli openings      # the named opening index, in standard-chess grammar

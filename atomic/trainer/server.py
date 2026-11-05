@@ -53,6 +53,7 @@ from . import (
     analysis,
     book,
     difficulty,
+    explain,
     generate,
     jobs,
     mine,
@@ -70,6 +71,12 @@ from . import (
 #: cheaper than the review pass: this is a hint, it happens while someone is
 #: waiting, and its answer goes into the same cache the deep passes read.
 FEEDBACK_NODES = 200_000
+
+#: Budget per search for "why this move". An explanation is four or five
+#: searches (the position, the move asked about, two null moves), so each one
+#: is kept to what lands in well under a second on the atomic net. Each is a
+#: cache key, so asking again is free.
+EXPLAIN_NODES = 300_000
 FEEDBACK_MULTIPV = 3
 
 #: Fairy-Stockfish as an *opponent*, in seconds per move. Time rather than
@@ -972,6 +979,27 @@ class Api:
             "lines": out,
         }
 
+    def explain(self, db: sqlite3.Connection, payload: dict) -> dict:
+        """Why the engine plays its move here, or why `move` is worse.
+
+        Every search goes through `analysis.evaluate_now`, so it is answered on
+        a warm session and lands in the same cache as everything else.
+        """
+        fen = str(payload["fen"])
+        nodes = min(int(payload.get("nodes", EXPLAIN_NODES)), 2_000_000)
+
+        def search(position: str, multipv: int) -> list[analysis.Line]:
+            return analysis.evaluate_now(db, position, nodes=nodes, multipv=multipv)
+
+        result = explain.explain(
+            fen, search,
+            move=payload.get("move") or None,
+            versus=payload.get("versus") or None,
+            model=winrate.load(),
+        )
+        result["nodes"] = nodes
+        return result
+
     @staticmethod
     def _variation(
         board: chess.variant.AtomicBoard, pv: Sequence[str]
@@ -1176,6 +1204,8 @@ class Handler(BaseHTTPRequestHandler):
                 return api.puzzle_attempt(db, payload)
             if route == "/api/evaluate":
                 return api.evaluate(db, payload)
+            if route == "/api/explain":
+                return api.explain(db, payload)
             if route == "/api/opening/name":
                 return api.opening_name(db, payload)
         raise KeyError("not found")

@@ -12,6 +12,7 @@
  */
 
 import { Board, staticState } from "/board.js";
+import { ExplainPanel } from "/explain.js";
 
 /* ---------- plumbing ---------- */
 
@@ -1859,6 +1860,8 @@ async function viewReview(query) {
   const detail = el("div", {});
   const graph = evalGraph(plies, (index) => select(index));
   let current = Math.min(Number(query.get("ply") || 0), plies.length - 1);
+  const why = new ExplainPanel(board, { onRestore: () => drawBoard() });
+  const whyCard = el("div", { class: "card", hidden: true }, el("h2", {}, "Why?"), why.root);
 
   const mine = plies.filter((p) => game.my_color === null || p.mover === game.my_color);
   const worst = mine.filter((p) => p.loss >= 10).sort((a, b) => b.loss - a.loss);
@@ -1866,9 +1869,20 @@ async function viewReview(query) {
 
   function select(index) {
     current = Math.max(0, Math.min(index, plies.length));
+    why.hide();
+    whyCard.hidden = true;
     drawMoves();
     drawDetail();
     graph.moveCursor(current);
+    drawBoard();
+  }
+
+  function explainPly(ply) {
+    whyCard.hidden = false;
+    why.show({ fen: ply.fen, move: ply.uci });
+  }
+
+  function drawBoard() {
     const ply = plies[current];
     if (ply) {
       board.setState(staticState(ply.fen));
@@ -1926,7 +1940,9 @@ async function viewReview(query) {
           el("td", { class: "num mono" },
             ply.unique_gap === null ? "—" : ply.unique_gap.toFixed(1))))),
       el("div", { class: "row", style: "margin-top:12px" },
-        el("button", { class: "primary",
+        el("button", { class: "primary", onClick: () => explainPly(ply) },
+          ply.loss >= 10 ? `Why is ${ply.san} bad?` : `Why ${ply.san}?`),
+        el("button", {
           onClick: () => go("play", { fen: ply.fen, side: ply.mover }) },
           "Play it out from here"),
         puzzle
@@ -1941,6 +1957,7 @@ async function viewReview(query) {
 
   const onKey = (event) => {
     if (event.target.matches("input, select, textarea")) return;
+    if (why.handleKey(event)) return;
     if (event.key === "ArrowRight") select(current + 1);
     else if (event.key === "ArrowLeft") select(current - 1);
     else if (event.key === "Home") select(0);
@@ -1974,6 +1991,7 @@ async function viewReview(query) {
       el("div", { class: "side" },
         el("div", { class: "card tight" }, graph),
         el("div", { class: "card" }, el("h2", {}, "This move"), detail),
+        whyCard,
         el("div", { class: "card" }, el("h2", {}, "Moves"), moveList),
         worst.length
           ? el("div", { class: "card" },
@@ -2009,6 +2027,9 @@ async function viewPlay(query) {
   let state = null;
   let busy = false;
   let moves = [];
+  // Every move with the position it was played from, so "why" can be asked of
+  // any of them after the fact.
+  let played = [];
 
   const levelSelect = el("select", {}, opponents.map((level) =>
     el("option", { value: level.id }, `${level.label} — ${level.detail}`)));
@@ -2020,6 +2041,32 @@ async function viewPlay(query) {
 
   const board = new Board(boardHost, { onMove: (uci) => play(uci) });
   board.setFlipped(side === "black");
+  const why = new ExplainPanel(board);
+  const whyButtons = el("div", { class: "row", style: "margin-top:10px" });
+  const whyCard = el("div", { class: "card" }, el("h2", {}, "Why?"), whyButtons, why.root);
+
+  function drawWhy() {
+    whyButtons.textContent = "";
+    const theirs = [...played].reverse().find((entry) => !entry.mine);
+    const mine = [...played].reverse().find((entry) => entry.mine);
+    if (theirs) {
+      whyButtons.append(el("button", {
+        class: "primary",
+        onClick: () => why.show({ fen: theirs.fen, move: theirs.uci,
+          title: `The engine played ${theirs.san}.` }),
+      }, `Why ${theirs.san}?`));
+    }
+    if (mine) {
+      whyButtons.append(el("button", {
+        onClick: () => why.show({ fen: mine.fen, move: mine.uci,
+          title: `You played ${mine.san}.` }),
+      }, `Was ${mine.san} OK?`));
+    }
+    if (!played.length) {
+      whyButtons.append(el("div", { class: "sub" },
+        "After a move, ask why the engine played it, or whether yours was any good."));
+    }
+  }
 
   function myTurn() {
     return state && !state.over && !busy && state.turn === sideSelect.value;
@@ -2040,7 +2087,10 @@ async function viewPlay(query) {
       : "Engine to move" + (state.check ? " — check" : "");
   }
 
-  function record(uci, next) {
+  function record(uci, next, before, mine) {
+    played.push({ fen: before, uci, san: next.san || uci, mine });
+    why.hide();
+    drawWhy();
     moves.push({ san: next.san || uci, boom: next.blast.length > 0 });
     history.textContent = "";
     for (let i = 0; i < moves.length; i += 2) {
@@ -2063,7 +2113,7 @@ async function viewPlay(query) {
         nodes: level.nodes || undefined,
         movetime: level.movetime || undefined,
       });
-      if (next.last) record(next.last, next);
+      if (next.last) record(next.last, next, state.fen, false);
       state = next;
       board.setState(state);
     } catch (error) {
@@ -2080,7 +2130,7 @@ async function viewPlay(query) {
     busy = true; board.setFrozen(true); updateStatus();
     try {
       const next = await api("/api/move", { fen: state.fen, move: uci });
-      record(uci, next);
+      record(uci, next, state.fen, true);
       state = next;
       board.setState(state);
       busy = false;
@@ -2094,6 +2144,9 @@ async function viewPlay(query) {
 
   async function reset(fen) {
     moves = [];
+    played = [];
+    why.hide();
+    drawWhy();
     history.textContent = "";
     evalBox.textContent = "";
     state = fen
@@ -2152,7 +2205,15 @@ async function viewPlay(query) {
             + "anything, and the full-strength Fairy-Stockfish levels carry no "
             + "number at all: the ladder is measured against that engine, so it "
             + "sits above the top of its own scale by construction.")),
+        whyCard,
         el("div", { class: "card" }, el("h2", {}, "Moves"), history))));
+
+  const onKey = (event) => {
+    if (event.target.matches("input, select, textarea")) return;
+    why.handleKey(event);
+  };
+  document.addEventListener("keydown", onKey);
+  teardown = () => document.removeEventListener("keydown", onKey);
 
   sideSelect.onchange = () => reset(startFen);
   await reset(startFen);

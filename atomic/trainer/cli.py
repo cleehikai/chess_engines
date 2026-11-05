@@ -35,12 +35,16 @@ import sqlite3
 import sys
 import time
 
+import chess
+import chess.variant
+
 from . import (
     analysis,
     book,
     difficulty,
     dump,
     endgames,
+    explain,
     generate,
     mine,
     openings,
@@ -239,6 +243,64 @@ def cmd_review(args: argparse.Namespace) -> int:
             f"({worst['win_before']:.0f}% -> {worst['win_after']:.0f}%)"
         )
         print(f"  replay from:  {worst['fen']}")
+    return 0
+
+
+def _parse_move(board: chess.variant.AtomicBoard, text: str | None) -> str | None:
+    """A move as UCI, accepting SAN too, which is what people type."""
+    if not text:
+        return None
+    try:
+        return board.parse_san(text).uci()
+    except ValueError:
+        move = chess.Move.from_uci(text)
+        if move not in board.legal_moves:
+            raise SystemExit(f"illegal move: {text}") from None
+        return move.uci()
+
+
+def cmd_explain(args: argparse.Namespace) -> int:
+    board = chess.variant.AtomicBoard(args.fen) if args.fen else chess.variant.AtomicBoard()
+    for san in args.moves or []:
+        board.push_san(san)
+    fen = board.fen()
+    move = _parse_move(board, args.move)
+    versus = _parse_move(board, args.versus)
+
+    with store.open_db() as db:
+        def search(position: str, multipv: int) -> list[analysis.Line]:
+            return analysis.evaluate_now(db, position, nodes=args.nodes, multipv=multipv)
+
+        try:
+            result = explain.explain(fen, search, move=move, versus=versus)
+        finally:
+            analysis.LIVE.close()
+
+    if result["over"]:
+        print(f"the game is over: {result['result']}")
+        return 0
+    print(fen)
+    print(f"\n{result['summary']}\n")
+
+    def show(heading: str, reasons: list[dict]) -> None:
+        print(heading)
+        if not reasons:
+            print("  no threat, no forcing line, no special rule: the engine just "
+                  "rates the resulting position highest")
+        for reason in reasons:
+            print(f"  [{reason['kind']}] {reason['text']}")
+        print()
+
+    best = result["best"]
+    alt = result["alternative"]
+    sections = [(f"What {best['san']} does ({best['win']:.0f}%):", result["reasons"])]
+    if alt:
+        sections.append((f"Why not {alt['san']} ({alt['win']:.0f}%, -{alt['loss']:.0f}):",
+                         alt["reasons"]))
+        if not result["subject_is_best"]:
+            sections.reverse()
+    for heading, reasons in sections:
+        show(heading, reasons)
     return 0
 
 
@@ -1237,6 +1299,16 @@ def main(argv: list[str] | None = None) -> int:
     p_review.add_argument("game", help="lichess game id")
     p_review.add_argument("--both", action="store_true", help="include the opponent")
     p_review.set_defaults(func=cmd_review)
+
+    p_ex = sub.add_parser(
+        "explain", help="why the engine plays its move, or why yours is worse"
+    )
+    p_ex.add_argument("fen", nargs="?", help="position (default: the start)")
+    p_ex.add_argument("--moves", nargs="*", help="SAN moves to play from the position first")
+    p_ex.add_argument("--move", help="the move to ask about (SAN or UCI); default: the engine's")
+    p_ex.add_argument("--versus", help="compare against this move instead of the second best")
+    p_ex.add_argument("--nodes", type=int, default=300_000, help="per search")
+    p_ex.set_defaults(func=cmd_explain)
 
     p_worst = sub.add_parser("worst", help="your biggest mistakes across all games")
     p_worst.add_argument("--limit", type=int, default=20)
