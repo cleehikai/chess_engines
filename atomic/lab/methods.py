@@ -138,11 +138,16 @@ class GreedyMaterialMethod(BaseMethod):
         for move in board.legal_moves:
             board.push(move)
             try:
+                # `is_variant_win`/`is_variant_loss` are relative to the side to
+                # move, and after the push that is the *opponent*. So the test
+                # for "I just won" is `is_variant_loss` — they have no king —
+                # and `is_variant_win` after a push means our own king is gone,
+                # which `AtomicBoard` never generates as legal anyway.
                 # Winning now beats any material consideration.
-                if board.is_variant_win() or board.is_checkmate():
+                if board.is_variant_loss() or board.is_checkmate():
                     return move
                 score = material_after(board, me, ATOMIC_PIECE_VALUES)
-                if board.is_variant_loss():
+                if board.is_variant_win():
                     score -= 1_000_000
             finally:
                 board.pop()

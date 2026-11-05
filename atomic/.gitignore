@@ -3,6 +3,12 @@ bin/*.exe
 data/*.nnue
 data/*.pt
 data/*.sqlite
+data/dumps/
+
+# NOT ignored, on purpose: data/winrate_atomic.json. It is measured output, but
+# the trainer needs it at runtime and it is three numbers — committing it means
+# a fresh clone judges moves correctly instead of falling back to the
+# standard-chess curve until someone spends 40 minutes refitting.
 
 # Measured output — regenerate rather than commit.
 results/

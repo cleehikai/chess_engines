@@ -4,6 +4,10 @@
 chess>=1.11          # atomic rules + UCI engine protocol
 pytest>=8.0
 
+# Trainer only: the Lichess database dumps are .pgn.zst, and neither the stdlib
+# (before 3.14) nor this machine has a zstd decoder.
+zstandard>=0.22
+
 # Training track (M2/M3). Torch is already present in this environment with
 # CUDA 12.8 for the RTX 5070; pinning it here would fight that install.
 # torch>=2.5

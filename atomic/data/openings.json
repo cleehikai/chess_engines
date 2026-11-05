@@ -1,0 +1,94 @@
+{
+  "_readme": [
+    "Curated names for atomic openings. Everything not listed here is named by",
+    "rule in trainer/openings.py, and anything you rename in the UI overrides",
+    "both. `line` is the SAN move sequence, space separated; '' is the start.",
+    "",
+    "`source` is the provenance of the NAME, not of the move:",
+    "  standard    - the name standard chess already gives this exact move order.",
+    "  community   - a name atomic players actually use.",
+    "  descriptive - coined here, and saying so rather than pretending otherwise.",
+    "",
+    "First moves borrow their standard-chess names on purpose. 1.Nh3 really is",
+    "the Amar Opening whatever variant is being played, the names are already in",
+    "everyone's head, and inventing a parallel vocabulary for the one ply atomic",
+    "shares with chess would make the index harder to use, not easier. Atomic",
+    "diverges from move 1 onwards, and so does the naming."
+  ],
+  "openings": [
+    {
+      "line": "Nf3",
+      "name": "King's Knight Opening",
+      "source": "standard",
+      "note": "52% of atomic games and the main road. Nf3 eyes e5 and g5, the two squares an undefended Black king's position leaks from."
+    },
+    {
+      "line": "e4",
+      "name": "King's Pawn Opening",
+      "source": "standard",
+      "note": "The standard-chess reflex, and it scores 43% here: the e-pawn's chief job in atomic is to be captured next to something that matters."
+    },
+    {
+      "line": "e3",
+      "name": "Van 't Kruijs Opening",
+      "source": "standard",
+      "note": "A sideline in chess and a main line in atomic: it opens the diagonals for Qf3/Qh5 and Bd3 without putting a pawn where it can be blasted."
+    },
+    {
+      "line": "Nh3",
+      "name": "Amar Opening",
+      "source": "standard",
+      "note": "A joke in standard chess. Fairy-Stockfish's first choice in atomic, against a field that plays 1.Nf3 seven times as often — the repo's open 1.Nh3-versus-1.Nf3 question is exactly this disagreement."
+    },
+    {"line": "d4", "name": "Queen's Pawn Opening", "source": "standard"},
+    {"line": "Nc3", "name": "Dunst Opening", "source": "standard"},
+    {"line": "c3", "name": "Saragossa Opening", "source": "standard"},
+    {"line": "g3", "name": "Benko Opening", "source": "standard"},
+    {"line": "c4", "name": "English Opening", "source": "standard"},
+    {"line": "f4", "name": "Bird's Opening", "source": "standard"},
+    {"line": "b3", "name": "Nimzo-Larsen Attack", "source": "standard"},
+    {"line": "g4", "name": "Grob's Attack", "source": "standard"},
+    {"line": "b4", "name": "Polish Opening", "source": "standard"},
+    {"line": "a3", "name": "Anderssen's Opening", "source": "standard"},
+    {"line": "h3", "name": "Clemenz Opening", "source": "standard"},
+    {"line": "f3", "name": "Barnes Opening", "source": "standard"},
+    {"line": "d3", "name": "Mieses Opening", "source": "standard"},
+    {"line": "Na3", "name": "Sodium Attack", "source": "standard"},
+    {"line": "h4", "name": "Desprez Opening", "source": "standard"},
+    {"line": "a4", "name": "Ware Opening", "source": "standard"},
+
+    {
+      "line": "Nf3 f6",
+      "name": "King's Knight Opening: f6 Defence",
+      "source": "descriptive",
+      "aliases": ["Main Line"],
+      "note": "76% of Black's replies and the position most atomic theory is about. 1...f6 takes e5 and g5 away from the knight and clears f7 for the king, which is the whole defensive idea of the variant."
+    },
+    {
+      "line": "Nf3 f6 Nc3",
+      "name": "King's Knight Opening: f6 Defence, Kapsarov Attack",
+      "source": "community",
+      "aliases": ["Two Knights Attack"],
+      "note": "Both knights out before a pawn moves. Black answers 2...c6 or 2...Nh6; the g4 push against the latter is the sharpest line in the opening."
+    },
+    {
+      "line": "Nf3 f6 e3",
+      "name": "King's Knight Opening: f6 Defence, e3 System",
+      "source": "community",
+      "aliases": ["Old Main Line"],
+      "note": "The move community theory calls best on both practical and theoretical grounds: it prepares 3.Ne5, which very few of Black's third moves actually stop."
+    },
+    {
+      "line": "Nf3 f6 Nd4",
+      "name": "King's Knight Opening: f6 Defence, Nd4 System",
+      "source": "descriptive",
+      "note": "The knight re-routes to f5 or b5 rather than staying on f3 to be traded. Black's 2...Nh6 is the main answer and 3.Nf5 the main test."
+    },
+    {
+      "line": "Nf3 e5",
+      "name": "King's Knight Opening: e5 Counterattack",
+      "source": "descriptive",
+      "note": "12% of Black's replies and the only popular one that hits back immediately. 2.Ng5 is the critical try; 2.Nxe5 is not, because the knight dies with the pawn — which is also why this is a counter rather than a gambit."
+    }
+  ]
+}

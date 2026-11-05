@@ -1,0 +1,593 @@
+/* Shared styling for the trainer. One dark theme, no framework, no build step.
+   The board rules are lifted from ui/index.html so the two pages look like the
+   same program; everything below the board section is new. */
+
+:root {
+  --bg: #16181d;
+  --panel: #1e2128;
+  --panel-2: #232733;
+  --line: #2c313c;
+  --text: #e6e8ec;
+  --dim: #8b93a3;
+  --faint: #626b7d;
+  --light: #b9a68b;
+  --dark: #6f5b45;
+  --sel: #6b9b4a;
+  --last: #7a7233;
+  --blast: #d0422e;
+  --accent: #7aa2f7;
+  --good: #6cc070;
+  --bad: #e2564a;
+  --warn: #d8a03a;
+  --radius: 7px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.55 ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+[hidden] { display: none !important; }
+
+/* -- shell ---------------------------------------------------------------- */
+
+header.top {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; gap: 18px;
+  padding: 0 20px;
+  background: #12141a;
+  border-bottom: 1px solid var(--line);
+}
+header.top .brand {
+  font-weight: 650; letter-spacing: .3px; padding: 13px 0; white-space: nowrap;
+}
+header.top .brand small { color: var(--dim); font-weight: 400; margin-left: 8px; }
+nav.tabs { display: flex; gap: 2px; flex: 1; flex-wrap: wrap; }
+nav.tabs a {
+  padding: 13px 13px 11px; color: var(--dim);
+  border-bottom: 2px solid transparent; text-decoration: none;
+  font-size: 13px; white-space: nowrap;
+}
+nav.tabs a:hover { color: var(--text); text-decoration: none; }
+nav.tabs a.active { color: var(--text); border-bottom-color: var(--accent); }
+header.top .health { font-size: 11px; color: var(--faint); text-align: right; }
+header.top .health.warn { color: var(--warn); }
+
+main { padding: 22px; max-width: 1400px; margin: 0 auto; }
+
+.view-title { display: flex; align-items: baseline; gap: 12px; margin: 0 0 4px; }
+.view-title h1 { font-size: 19px; margin: 0; font-weight: 600; }
+.view-title .sub { color: var(--dim); font-size: 13px; }
+.lede { color: var(--dim); font-size: 13px; margin: 0 0 18px; max-width: 78ch; }
+
+/* -- layout --------------------------------------------------------------- */
+
+.split { display: flex; gap: 22px; align-items: flex-start; flex-wrap: wrap; }
+.split > .side { width: 340px; flex: 0 0 340px; display: flex; flex-direction: column; gap: 14px; }
+.split > .wide { flex: 1 1 420px; min-width: 320px; display: flex; flex-direction: column; gap: 14px; }
+.grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 14px 15px;
+}
+.card.tight { padding: 10px 12px; }
+.card h2 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: .8px;
+  color: var(--dim); margin: 0 0 10px; font-weight: 600;
+}
+.card h2 .right { float: right; text-transform: none; letter-spacing: 0; }
+.sub { color: var(--dim); font-size: 12px; margin: 0; }
+.muted { color: var(--dim); }
+.faint { color: var(--faint); }
+.big { font-size: 26px; font-weight: 600; line-height: 1.15; }
+.mono { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; }
+.tiny { font-size: 11px; }
+.nowrap { white-space: nowrap; }
+
+.stat { display: flex; flex-direction: column; gap: 2px; }
+.stat .label { font-size: 11px; text-transform: uppercase; letter-spacing: .7px; color: var(--dim); }
+
+/* -- controls ------------------------------------------------------------- */
+
+button, select, input[type=text] {
+  font: inherit; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 5px; padding: 7px 11px;
+}
+button { cursor: pointer; }
+button:hover:not(:disabled) { background: #2f3542; }
+button:disabled { opacity: .4; cursor: default; }
+button.primary { background: #2d4a7c; border-color: #395c98; }
+button.primary:hover:not(:disabled) { background: #35558d; }
+button.ghost { background: transparent; }
+button.wide { width: 100%; }
+.row { display: flex; gap: 8px; flex-wrap: wrap; }
+.row.tight { gap: 5px; }
+label.field { display: block; font-size: 11px; color: var(--dim); margin: 0 0 4px; }
+.field-group { display: flex; flex-direction: column; gap: 3px; }
+select { width: 100%; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.chip {
+  font-size: 11px; padding: 3px 8px; border-radius: 999px;
+  background: var(--panel-2); border: 1px solid var(--line); color: var(--dim);
+  cursor: pointer; user-select: none;
+}
+.chip:hover { color: var(--text); }
+.chip.on { background: #2d4a7c; border-color: #395c98; color: #eaf0ff; }
+.chip.static { cursor: default; }
+.chip.static:hover { color: var(--dim); }
+
+.tag {
+  display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 3px;
+  background: #262b34; color: var(--dim); border: 1px solid var(--line);
+  margin: 1px 3px 1px 0; white-space: nowrap;
+}
+.good-text { color: var(--good); }
+.bad-text { color: var(--bad); }
+
+.tag.good { color: var(--good); border-color: #2f5133; }
+.tag.bad { color: var(--bad); border-color: #5a2b27; }
+.tag.warn { color: var(--warn); border-color: #5b4520; }
+.tag.accent { color: var(--accent); border-color: #2c3f68; }
+
+/* -- tables --------------------------------------------------------------- */
+
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th {
+  text-align: left; font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .7px; color: var(--dim); font-weight: 600;
+  padding: 6px 9px; border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+td { padding: 6px 9px; border-bottom: 1px solid #23262e; vertical-align: top; }
+tr:last-child td { border-bottom: 0; }
+tbody tr.clickable { cursor: pointer; }
+tbody tr.clickable:hover { background: #232733; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.scroll-x { overflow-x: auto; }
+.scroll-y { overflow-y: auto; }
+
+/* -- board ---------------------------------------------------------------- */
+
+.board-wrap { position: relative; width: max-content; }
+.board {
+  display: grid;
+  grid-template-columns: repeat(8, var(--sq));
+  grid-template-rows: repeat(8, var(--sq));
+  --sq: min(9.5vw, 68px);
+  border: 1px solid var(--line);
+  border-radius: 4px; overflow: hidden;
+  user-select: none;
+  /* Dragging a piece on a touchscreen must not also scroll the page, and the
+     browser decides that before any JS runs. */
+  touch-action: none;
+}
+.board-sm .board { --sq: min(7vw, 44px); }
+.board-lg .board { --sq: min(11vw, 78px); }
+
+.arrows {
+  position: absolute; inset: 0; pointer-events: none; z-index: 5;
+  width: 100%; height: 100%;
+}
+.arrow { stroke-width: .13; stroke-linecap: round; opacity: .8; }
+/* stroke-width defaults to 1 *user unit*, and a user unit here is a whole
+   square — without this the arrowhead is drawn with a one-square-wide outline
+   and swallows most of the board. */
+.arrow-head { stroke-width: 0; opacity: .8; }
+.arrow-best { stroke: #4d90d6; fill: #4d90d6; }
+.arrow-bad { stroke: var(--bad); fill: var(--bad); }
+.arrow-hint { stroke: var(--warn); fill: var(--warn); }
+/* Second and third choices, drawn faintly so "the engine also considered
+   this" never competes with "the engine plays this". */
+.arrow-alt { stroke: #7f8da3; fill: #7f8da3; opacity: .45; }
+.arrow-alt.arrow-head { opacity: .45; }
+
+/* -- the analysis board --------------------------------------------------- */
+
+.board-row { display: flex; gap: 8px; align-items: stretch; }
+
+/* Vertical, White at the bottom, exactly like the one everybody already knows
+   how to read. It shows win% rather than centipawns because in atomic those
+   are not the same shape at all: +250cp is 56%, not 76%. */
+.evalbar {
+  position: relative; width: 26px; flex: 0 0 26px; border-radius: 3px;
+  background: #14161b; border: 1px solid var(--line); overflow: hidden;
+  opacity: .25; transition: opacity .2s;
+}
+.evalbar.on { opacity: 1; }
+/* The fill is *White's* share, in White's colour, anchored at White's end of
+   the board — so it moves to the top when the board is flipped. Drawing it
+   from the bottom either way would mean a bar that goes white when Black is
+   winning, which is what every analysis board's convention forbids. */
+.evalbar .fill {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 50%;
+  background: #e8e6e1; transition: height .35s ease;
+}
+.evalbar.flipped .fill { bottom: auto; top: 0; }
+.evalbar .even {
+  position: absolute; left: 0; right: 0; top: 50%; height: 1px;
+  background: #ffffff40;
+}
+/* The number, at whichever end of the bar the winning side holds. Placement
+   (`low`) and colour (`on-fill`) are separate classes because the flip moves
+   the fill without moving the winner: with Black at the bottom and Black
+   ahead, the number belongs at the bottom *and* on the dark ground. */
+.evalbar .score {
+  position: absolute; left: 0; right: 0; top: 2px;
+  font-size: 10px; font-weight: 700; text-align: center; line-height: 1.2;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: #e8e6e1; letter-spacing: -.03em;
+}
+.evalbar .score.low { top: auto; bottom: 2px; }
+.evalbar .score.on-fill { color: #14161b; }
+
+.analysis { display: flex; flex-direction: column; gap: 3px; min-height: 54px; }
+.analysis.thinking { opacity: .45; }
+.analysis-line {
+  display: flex; gap: 8px; align-items: baseline;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12px; padding: 2px 0;
+}
+.analysis-line .score {
+  min-width: 3.4em; text-align: right; font-weight: 600; color: var(--text);
+}
+.analysis-line .score.alt { color: var(--dim); font-weight: 400; }
+.analysis-line .win { min-width: 3em; text-align: right; color: var(--dim); }
+
+.turnchip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--dim); margin-right: 10px;
+}
+.turnchip i {
+  width: 10px; height: 10px; border-radius: 50%;
+  background: #e8e6e1; border: 1px solid var(--line);
+}
+.turnchip.black i { background: #1c1e24; border-color: #55596a; }
+.analysis-line .pv {
+  color: var(--dim); overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap; flex: 1;
+}
+.analysis-line .pv-move { cursor: pointer; padding: 0 2px; border-radius: 2px; }
+.analysis-line .pv-move:hover { background: #33405a; color: var(--text); }
+
+.sq {
+  position: relative;
+  display: flex; align-items: center; justify-content: center;
+  font-size: calc(var(--sq) * 0.78);
+  line-height: 1; cursor: default;
+}
+.sq.light { background: var(--light); }
+.sq.dark  { background: var(--dark); }
+.sq.grabbable { cursor: grab; }
+.sq.grabbable:active { cursor: grabbing; }
+.sq.selected::after, .sq.lastmove::after,
+.sq.mark-right::after, .sq.mark-wrong::after, .sq.mark-hint::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+}
+.sq.lastmove::after { background: var(--last); opacity: .45; }
+.sq.selected::after { background: var(--sel); opacity: .55; }
+.sq.mark-right::after { background: var(--good); opacity: .5; }
+.sq.mark-wrong::after { background: var(--bad); opacity: .5; }
+.sq.mark-hint::after {
+  box-shadow: inset 0 0 0 calc(var(--sq) * .07) var(--warn); opacity: .9;
+}
+/* -- pieces ---------------------------------------------------------------
+   cburnett, the Lichess default set (ui/pieces/README.md). Drawn as a
+   background image rather than an <img> so a piece is one empty element that
+   CSS can scale, ghost and drop-shadow without a second node inside it.
+
+   The shadow is a `drop-shadow` filter and not a `box-shadow`: these are
+   transparent SVGs, and a box shadow would outline the square they sit in
+   rather than the piece. */
+.piece {
+  position: relative; z-index: 2;
+  /* `display` is load-bearing, not tidiness: this is a span, and an inline box
+     ignores width and height. On a square it survives without it (a flex item
+     is blockified), but in the promotion dialog it is a plain button child and
+     collapsed to nothing — four empty buttons where the pieces should be. */
+  display: block;
+  width: 100%; height: 100%; flex: 0 0 auto;
+  background-size: 100% 100%;
+  background-position: center;
+  background-repeat: no-repeat;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .45));
+  transition: transform .11s cubic-bezier(.2, 1.4, .5, 1), filter .11s ease;
+  pointer-events: none;   /* the square handles every gesture */
+}
+
+/* The lift. Small, fast, and on the piece rather than the square, so it reads
+   as picking something up instead of highlighting a cell. */
+.sq.selected .piece,
+.sq.grabbable:active .piece { transform: scale(1.09); }
+.sq.selected .piece { filter: drop-shadow(0 3px 4px rgba(0, 0, 0, .55)); }
+
+/* What is left behind while the piece itself is under the pointer. */
+.piece.ghost { opacity: .28; transform: none; filter: none; }
+
+/* The piece in the air. Fixed to the viewport and centred on the pointer, so
+   it neither inherits the board's clipping nor lags a scroll. */
+.piece-drag {
+  position: fixed; z-index: 80; pointer-events: none;
+  transform: translate(-50%, -50%) scale(1.12);
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, .6));
+  transition: none;   /* it follows the pointer; easing would be lag */
+}
+
+.piece.p-wK { background-image: url("pieces/wK.svg"); }
+.piece.p-wQ { background-image: url("pieces/wQ.svg"); }
+.piece.p-wR { background-image: url("pieces/wR.svg"); }
+.piece.p-wB { background-image: url("pieces/wB.svg"); }
+.piece.p-wN { background-image: url("pieces/wN.svg"); }
+.piece.p-wP { background-image: url("pieces/wP.svg"); }
+.piece.p-bK { background-image: url("pieces/bK.svg"); }
+.piece.p-bQ { background-image: url("pieces/bQ.svg"); }
+.piece.p-bR { background-image: url("pieces/bR.svg"); }
+.piece.p-bB { background-image: url("pieces/bB.svg"); }
+.piece.p-bN { background-image: url("pieces/bN.svg"); }
+.piece.p-bP { background-image: url("pieces/bP.svg"); }
+
+.hint {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  z-index: 3; pointer-events: none;
+  width: 30%; height: 30%; border-radius: 50%; background: rgba(0,0,0,.32);
+}
+.hint.capture {
+  width: 92%; height: 92%; border-radius: 50%;
+  background: none; border: calc(var(--sq) * 0.08) solid rgba(0,0,0,.32);
+}
+.sq.blast { animation: boom .7s ease-out; }
+@keyframes boom {
+  0%   { box-shadow: inset 0 0 0 0 var(--blast); background: var(--blast); }
+  100% { box-shadow: inset 0 0 0 0 transparent; }
+}
+.coord {
+  position: absolute; font-size: 10px; font-weight: 600;
+  opacity: .55; z-index: 4; pointer-events: none;
+}
+.coord.file { right: 3px; bottom: 1px; }
+.coord.rank { left: 3px; top: 1px; }
+
+.promo-backdrop {
+  position: fixed; inset: 0; background: #000a; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+}
+.promo {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px; text-align: center;
+}
+.promo .row { margin-top: 10px; }
+.promo button { padding: 6px 10px; }
+/* The piece fills its square everywhere else, so it needs a size of its own
+   here — a button is not a board square. */
+.promo button .piece { width: 38px; height: 38px; }
+
+/* -- move list ------------------------------------------------------------ */
+
+.movelist {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 12.5px;
+  display: grid; grid-template-columns: 2.6em 1fr 1fr; gap: 1px 4px;
+  max-height: 340px; overflow-y: auto; align-content: start;
+}
+.movelist .n { color: var(--faint); padding: 2px 0; }
+.movelist .mv {
+  padding: 2px 6px; border-radius: 3px; cursor: pointer;
+  display: flex; justify-content: space-between; gap: 6px;
+}
+.movelist .mv:hover { background: #2b313c; }
+.movelist .mv.current { background: #33405a; }
+.movelist .mv .cost { font-size: 10.5px; }
+.movelist .mv.blunder { color: #ff8b7e; }
+.movelist .mv.mistake { color: #f0b46a; }
+.movelist .mv.inaccuracy { color: #e2d67c; }
+
+/* The puzzle board's line reads left to right like a game score rather than in
+   two columns, because it is one line and it is usually short. */
+.movelist.plain {
+  display: block; max-height: 96px; margin-top: 8px;
+  white-space: normal; line-height: 1.9;
+}
+.movelist.plain .n { color: var(--faint); margin-left: 5px; }
+.movelist.plain .mv { display: inline; padding: 2px 5px; }
+.movelist.plain .mv.setup { color: #ff8b7e; }      /* the mistake */
+.movelist.plain .mv.solution { color: var(--good); }
+.movelist.plain .mv.explore { color: var(--accent); font-style: italic; }
+.movelist.plain .mv.current { background: #33405a; color: var(--text); }
+
+.step { padding: 4px 10px; line-height: 1; }
+.rewound { margin-top: 8px; color: var(--warn); }
+
+/* -- win% graph ----------------------------------------------------------- */
+
+.evalgraph { width: 100%; height: 74px; display: block; cursor: pointer; }
+.evalgraph .fill { fill: #4d6a94; opacity: .55; }
+.evalgraph .zero { stroke: var(--faint); stroke-width: 1; stroke-dasharray: 3 3; }
+.evalgraph .cursor { stroke: var(--accent); stroke-width: 1.5; }
+.evalgraph .dot-blunder { fill: var(--bad); }
+.evalgraph .dot-mistake { fill: var(--warn); }
+
+.bar {
+  height: 6px; border-radius: 3px; background: #2a2f3a; overflow: hidden;
+  min-width: 90px;  /* a table cell shrinks to its content, and this has none */
+}
+.bar > span { display: block; height: 100%; background: var(--accent); }
+
+/* -- confidence intervals -------------------------------------------------- */
+/* The improvement tab draws the interval rather than the point estimate, so
+   three attempts look like three attempts. `.point` is the observed rate and
+   `.overall` is your rate across everything — a slice earns a verdict only
+   when the span clears that tick. */
+
+.range {
+  position: relative; height: 14px; min-width: 130px;
+  background: #23262e; border-radius: 3px;
+}
+.range .span {
+  position: absolute; top: 4px; height: 6px; border-radius: 3px;
+  background: #3f5f8d;
+}
+.range .point {
+  position: absolute; top: 2px; width: 2px; height: 10px; background: var(--text);
+  margin-left: -1px;
+}
+.range .overall {
+  position: absolute; top: 0; width: 1px; height: 14px;
+  background: var(--warn); opacity: .8;
+}
+
+/* -- generation jobs ------------------------------------------------------ */
+
+.jobforms { display: flex; flex-direction: column; gap: 6px; }
+.jobform { border: 1px solid var(--line); border-radius: 5px; padding: 8px 10px; }
+.jobform summary { cursor: pointer; font-size: 13px; }
+.jobform[open] summary { margin-bottom: 4px; color: var(--text); }
+.job { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.job:first-child { border-top: 0; }
+
+/* -- puzzle feedback ------------------------------------------------------ */
+
+/* What the puzzle is asking for. Colour-coded because it is the one thing the
+   solver has to read before touching a piece: green is a win to convert, amber
+   is a hold — you are playing not to lose, and there is no knockout to hunt. */
+.goal {
+  margin: 8px 0 2px; padding: 8px 10px; border-radius: var(--radius);
+  background: var(--panel-2); border-left: 3px solid var(--dim);
+}
+.goal.win  { border-left-color: var(--good); }
+.goal.hold { border-left-color: var(--warn); }
+.goal .goal-head {
+  display: flex; align-items: center; gap: 8px; justify-content: space-between;
+}
+.goal.win .goal-head b  { color: var(--good); }
+.goal.hold .goal-head b { color: var(--warn); }
+.goal .sub { margin-top: 3px; }
+
+.verdict { font-weight: 600; font-size: 15px; min-height: 22px; }
+.verdict.right { color: var(--good); }
+.verdict.wrong { color: var(--bad); }
+.verdict.done { color: var(--accent); }
+
+.streak { display: flex; gap: 3px; flex-wrap: wrap; }
+.streak i {
+  width: 9px; height: 9px; border-radius: 2px; background: #333a47;
+  display: inline-block;
+}
+.streak i.hit { background: var(--good); }
+.streak i.miss { background: var(--bad); }
+
+.kbd {
+  font-family: ui-monospace, Consolas, monospace; font-size: 10.5px;
+  border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 3px; padding: 0 4px; color: var(--dim); background: #20242c;
+}
+
+/* -- disclosure ----------------------------------------------------------- */
+
+/* Everything that is worth having and not worth looking at: the filter bar
+   once a queue is chosen, the generation forms, the keyboard map, the
+   explanation of what a puzzle here is. Folded, with the summary line saying
+   what is inside, so nothing is hidden — only out of the way of the board. */
+.disclosure {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 9px 12px;
+}
+.disclosure > summary {
+  cursor: pointer; font-size: 12.5px; color: var(--dim);
+  list-style: none; display: flex; align-items: center; gap: 8px;
+}
+.disclosure > summary::-webkit-details-marker { display: none; }
+.disclosure > summary::before {
+  content: "▸"; font-size: 9px; color: var(--faint); transition: transform .12s;
+}
+.disclosure[open] > summary::before { content: "▾"; }
+.disclosure > summary:hover { color: var(--text); }
+.disclosure.quiet { background: transparent; border: 0; padding: 4px 0; }
+.filter-summary { color: var(--text); }
+
+.puzzle-head { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+/* The streak reads as one line beside the board's title rather than as a
+   panel: it is feedback on the sitting, not a thing to study. */
+.puzzle-head .streak { align-items: center; min-height: 9px; }
+.puzzle-head .streak .streak-count { margin-left: 6px; }
+.streak .streak-count { width: 100%; margin-top: 6px; }
+
+/* -- opening index -------------------------------------------------------- */
+
+/* A tree, not a table: the indentation *is* the structure, and a name means
+   nothing without the line it hangs off. Rows are one line high so a family
+   and its variations fit on a screen together. */
+.opening-tree { display: flex; flex-direction: column; }
+.opening-row {
+  display: flex; gap: 10px; align-items: center;
+  padding: 3px 4px; border-radius: 4px; cursor: pointer;
+}
+.opening-row:hover { background: #232733; }
+.opening-row .twist { color: var(--faint); font-size: 10px; width: 10px; }
+.opening-row .twist.leaf { opacity: .35; }
+.opening-name { font-size: 13px; }
+/* The move sequence sits right beside the name rather than in a column of its
+   own: a name and the moves it refers to are one fact, and a table that pushes
+   them to opposite sides of the screen makes the reader carry it across. */
+.opening-line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opening-stats {
+  margin-left: auto; display: flex; gap: 10px; align-items: center;
+  flex: 0 0 auto;
+}
+.opening-stats .num { min-width: 62px; text-align: right; font-variant-numeric: tabular-nums; }
+.opening-stats .num + .num { min-width: 34px; }
+.opening-stats .tag { min-width: 66px; text-align: center; }
+button.tiny { font-size: 11px; padding: 2px 7px; }
+
+.rename { margin: 4px 0 8px; background: var(--panel-2); }
+.rename input {
+  background: #171a20; border: 1px solid var(--line); color: var(--text);
+  border-radius: 4px; padding: 5px 8px; font: inherit; font-size: 13px;
+}
+.rename input:focus { outline: 1px solid var(--accent); }
+
+table.rep-lines tr.group td {
+  border-bottom: 0; padding-top: 14px; padding-bottom: 2px;
+}
+table.rep-lines tr.group .group-name {
+  font-weight: 600; font-size: 12px; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--accent);
+}
+table.rep-lines tr.rename-row td { padding: 0; }
+
+/* -- traps ---------------------------------------------------------------- */
+
+.traplist { display: flex; flex-direction: column; gap: 2px; }
+.trap-row {
+  padding: 7px 9px; border-radius: 5px; cursor: pointer;
+  border-left: 3px solid transparent;
+}
+.trap-row:hover { background: #232733; }
+.trap-row.on { background: #262c3a; border-left-color: var(--accent); }
+.trap-name { font-size: 13px; margin: 2px 0 1px; }
+
+.empty {
+  color: var(--dim); text-align: center; padding: 34px 18px;
+  border: 1px dashed var(--line); border-radius: var(--radius);
+}
+.empty code { color: var(--accent); }
+
+.toast {
+  position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+  background: #2a2130; border: 1px solid var(--bad); color: #ffd9d4;
+  padding: 9px 15px; border-radius: var(--radius); z-index: 80; font-size: 13px;
+  max-width: 70ch;
+}
+
+.spinner { color: var(--dim); font-size: 13px; padding: 20px 0; }
+
+@media (max-width: 900px) {
+  .split > .side { flex: 1 1 100%; width: 100%; }
+}
